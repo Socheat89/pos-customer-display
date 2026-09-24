@@ -213,10 +213,10 @@ html, body {
 .panel-right {
   width: 50%;
   height: 100%;
-  background: #FFFFFF;
+  background: #F8F9FA;
   display: flex;
   flex-direction: column;
-  padding: 32px 36px;
+  padding: 28px 32px;
   position: relative;
   overflow-y: auto;
 }
@@ -224,37 +224,44 @@ html, body {
 .right-content-wrapper {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  gap: 16px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 .receipt-header {
-  border-bottom: 2px solid #E9ECEF;
+  border-bottom: 2px solid #DEE2E6;
   padding-bottom: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .receipt-header h2 {
   font-size: 1.25rem;
   font-weight: 800;
-  color: #212529;
+  color: #0F172A;
+  letter-spacing: -0.3px;
 }
 
 .items-list-container {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
   overflow-y: auto;
   padding-right: 4px;
 }
 
 .items-list-container::-webkit-scrollbar { width: 5px; }
-.items-list-container::-webkit-scrollbar-thumb { background: #DEE2E6; border-radius: 4px; }
+.items-list-container::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
 
 /* Item Row matching Odoo POS Receipt Layout */
 .item-row {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 14px 0;
-  border-bottom: 1px solid #F1F3F5;
+  padding: 12px 0;
+  border-bottom: 1px solid #E2E8F0;
   animation: slideIn 0.25s ease-out;
 }
 
@@ -267,34 +274,40 @@ html, body {
 }
 
 .item-name {
-  font-size: 0.98rem;
+  font-size: 0.96rem;
   font-weight: 700;
-  color: #1A1A1A;
-  line-height: 1.3;
+  color: #0F172A;
+  line-height: 1.35;
 }
 
 .item-sub-detail {
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 500;
-  color: #6C757D;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .item-qty-badge {
-  display: inline-block;
-  padding: 1px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
   border-radius: 4px;
-  background: #E9ECEF;
-  border: 1px solid #CED4DA;
-  font-weight: 700;
-  color: #212529;
-  font-size: 0.78rem;
-  margin-right: 4px;
+  background: #E2E8F0;
+  border: 1px solid #CBD5E1;
+  font-weight: 800;
+  color: #0F172A;
+  font-size: 0.76rem;
 }
 
 .item-line-total {
   font-size: 1rem;
   font-weight: 800;
-  color: #1A1A1A;
+  color: #0F172A;
   white-space: nowrap;
 }
 
@@ -303,41 +316,28 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 0;
-  border-top: 2px solid #212529;
-  margin-top: 12px;
+  padding: 16px 0;
+  border-top: 2px solid #0F172A;
+  margin-top: 4px;
 }
 
 .receipt-total-label {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 800;
-  color: #212529;
+  color: #0F172A;
 }
 
 .receipt-total-value {
-  font-size: 1.6rem;
+  font-size: 1.7rem;
   font-weight: 900;
-  color: #212529;
+  color: #E1251B;
 }
 
 /* KHQR Card Section below total */
 .khqr-card-section {
-  margin-top: 16px;
+  margin-top: 8px;
   display: flex;
   justify-content: center;
-}
-
-/* ── Right Panel (45%) — KHQR template3_color ──────────── */
-.panel-right {
-  width: 45%;
-  height: 100%;
-  background: linear-gradient(160deg, #1a0a0a 0%, #2d0c0a 50%, #1a0a0a 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 28px 24px;
-  position: relative;
-  overflow: hidden;
 }
 
 /* Decorative circles */
