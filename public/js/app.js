@@ -119,6 +119,21 @@
       return;
     }
 
+    // Direct Base64 Image support (e.g. ABA PayWay qrImage)
+    if (typeof qrString === "string" && (qrString.startsWith("data:image/") || qrString.startsWith("http://") || qrString.startsWith("https://"))) {
+      const img = document.createElement("img");
+      img.src = qrString;
+      img.alt = "ABA KHQR Payment Code";
+      img.style.width = "180px";
+      img.style.height = "180px";
+      img.style.borderRadius = "8px";
+      img.onerror = () => {
+        container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
+      };
+      container.appendChild(img);
+      return;
+    }
+
     // 1. Primary: Try qrcode.js with CorrectLevel.L (handles up to 154 chars)
     try {
       new QRCode(container, {

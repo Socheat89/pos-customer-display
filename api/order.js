@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       amount_total: Number(payload.amount_total !== undefined ? payload.amount_total : (payload.amount !== undefined ? payload.amount : 0)),
       currency: payload.currency || (payload.currency_id === 1 ? 'USD' : (payload.currency_id === 143 ? 'KHR' : 'USD')),
       items: Array.isArray(payload.items) ? payload.items : (Array.isArray(payload.order_lines) ? payload.order_lines : []),
-      qr_string: payload.qr_string || defaultQR,
+      qr_string: payload.qrString || payload.qr_string || payload.qrImage || payload.qr_code || payload.qr || defaultQR,
       ...payload,
       updated_at: Date.now()
     };
