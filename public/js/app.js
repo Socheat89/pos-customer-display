@@ -286,6 +286,20 @@
     // Render QR code
     renderQRCode(data.qr_string || null);
 
+    // Toggle KHQR Card Popup visibility based on show_qr flag
+    const khqrSection = document.getElementById("khqr-card-section");
+    const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true;
+
+    if (khqrSection) {
+      if (showQR) {
+        khqrSection.classList.remove("hidden");
+        khqrSection.style.display = "flex";
+      } else {
+        khqrSection.classList.add("hidden");
+        khqrSection.style.display = "none";
+      }
+    }
+
     showScreen("pending");
   }
 

@@ -228,6 +228,7 @@ export default async function handler(req, res) {
       currency: currency,
       items: items,
       qr_string: qrString,
+      show_qr: payload.show_qr !== undefined ? Boolean(payload.show_qr) : Boolean(payload.is_payment || payload.payment),
       updated_at: Date.now(),
     };
 
