@@ -43,20 +43,8 @@
        ╚══════════════════════════════════════════════════════╝ -->
   <section id="screen-idle" aria-label="Welcome screen" aria-live="polite">
 
-    <div class="idle-logo-ring" aria-hidden="true">
-      <!-- Shopping bag icon -->
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-        <line x1="3" y1="6" x2="21" y2="6"/>
-        <path d="M16 10a4 4 0 01-8 0"/>
-      </svg>
-    </div>
-
-    <div>
-      <h1 class="idle-store-name">
-        SK COSMETIC
-        <span>អេសខេ គ្រឿងក្រអូប</span>
-      </h1>
+    <div class="idle-brand-container">
+      <img src="https://i.ibb.co/hFCPc9QC/skcos-cover-01.png" alt="SK Cosmetic Logo" class="idle-brand-logo" />
     </div>
 
     <p class="idle-tagline">
@@ -68,53 +56,46 @@
       <span>Waiting for order&hellip;</span>
     </div>
 
-    <!-- Store ID indicator — populated by app.js, helps verify correct store is active -->
+    <!-- Store ID indicator -->
     <div class="idle-store-indicator" id="idle-store-indicator" aria-label="Active store"></div>
 
   </section>
 
 
   <!-- ╔══════════════════════════════════════════════════════╗
-       ║  SCREEN: PENDING — Split Layout (Order + KHQR)      ║
+       ║  SCREEN: PENDING — Split Layout (Logo + Order/KHQR) ║
        ╚══════════════════════════════════════════════════════╝ -->
   <section id="screen-pending" class="hidden" aria-label="Order and payment screen" aria-live="polite">
 
-    <!-- ── LEFT PANEL: Order Details (55%) ──────────────── -->
+    <!-- ── LEFT PANEL: Brand Logo Hero (50%) ────────────── -->
     <div class="panel-left">
 
-      <!-- Header -->
-      <header class="left-header">
-        <div class="store-badge" aria-hidden="true">
-          <!-- Store icon -->
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-            <polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-        </div>
-        <div class="left-header-text">
-          <h1>SK COSMETIC</h1>
-          <p>អេសខេ គ្រឿងក្រអូប</p>
-        </div>
+      <div class="brand-hero-wrapper">
+        <img src="https://i.ibb.co/hFCPc9QC/skcos-cover-01.png" alt="SK Cosmetic Logo" class="hero-brand-logo" />
+      </div>
+
+      <footer class="panel-left-footer">
         <!-- Order reference chip (populated by JS) -->
         <div class="order-ref-chip" id="order-ref-chip" aria-label="Order reference">—</div>
-      </header>
+      </footer>
 
-      <!-- Items Section -->
-      <div class="items-section">
+    </div><!-- /panel-left -->
 
-        <div class="items-label">Order Summary</div>
 
-        <!-- Column headers -->
-        <div class="items-header-row" aria-hidden="true">
-          <span>Item</span>
-          <span style="text-align:center">Qty</span>
-          <span style="text-align:right">Amount</span>
-        </div>
+    <!-- ── RIGHT PANEL: Order Details + KHQR (50%) ───────── -->
+    <div class="panel-right">
 
-        <!-- Item rows injected by app.js -->
+      <div class="right-content-wrapper">
+
+        <!-- Receipt Header -->
+        <header class="receipt-header">
+          <h2>Order Summary</h2>
+        </header>
+
+        <!-- Dynamic Items List (Injected by app.js matching Odoo layout) -->
         <div
           id="items-list"
-          class="items-list"
+          class="items-list-container"
           role="list"
           aria-label="Order items"
           aria-live="polite"
@@ -122,108 +103,62 @@
           <!-- Dynamic content -->
         </div>
 
-      </div><!-- /items-section -->
-
-      <!-- Total Bar -->
-      <div class="total-bar" aria-label="Total amount">
-        <span class="total-label">Total Amount</span>
-        <div>
-          <span class="total-amount" id="total-amount">0.00</span>
-          <span class="total-currency" id="total-currency">USD</span>
-        </div>
-      </div>
-
-    </div><!-- /panel-left -->
-
-
-    <!-- ── RIGHT PANEL: ABA KHQR (45%) — template3_color ─── -->
-    <div class="panel-right">
-
-      <!--
-        ┌──────────────────────────────────┐
-        │   KHQR OUTER CARD (ABA Red)      │
-        │  ┌────────────────────────────┐  │
-        │  │   KHQR Inner White Card    │  │
-        │  └────────────────────────────┘  │
-        └──────────────────────────────────┘
-      -->
-      <div class="khqr-outer-card" role="region" aria-label="ABA KHQR payment card">
-
-        <!-- Outer Card Header -->
-        <div class="khqr-header">
-          <div class="khqr-brand">
-            <!-- KHQR logo icon -->
-            <div class="khqr-logo-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" fill="currentColor" stroke="none"/>
-              </svg>
-            </div>
-            <span class="khqr-logo-text">KHQR</span>
-          </div>
-
-          <!-- ABA PayWay badge -->
-          <div class="aba-payway-badge" aria-label="ABA PayWay">
-            <span class="aba-dot" aria-hidden="true"></span>
-            <span>ABA PayWay</span>
-          </div>
+        <!-- Receipt Total Bar -->
+        <div class="receipt-total-row" aria-label="Total amount">
+          <span class="receipt-total-label">Total</span>
+          <span class="receipt-total-value" id="total-amount">$ 0.00</span>
         </div>
 
-        <!-- Inner White Card -->
-        <div class="khqr-inner-card">
+        <!-- KHQR Card Container -->
+        <div class="khqr-card-section">
+          <div class="khqr-outer-card" role="region" aria-label="ABA KHQR payment card">
 
-          <!-- Merchant name -->
-          <div class="merchant-info">
-            <div class="merchant-name-en">SK COSMETIC</div>
-            <div class="merchant-name-kh">អេសខេ គ្រឿងក្រអូប</div>
-          </div>
-
-          <!-- Payment amount display -->
-          <div class="payment-amount-display" aria-label="Payment amount">
-            <div class="amount-label">Amount to Pay</div>
-            <div>
-              <span class="amount-value" id="amount-value">0.00</span><span class="amount-currency-tag" id="amount-currency-tag">USD</span>
+            <!-- Outer Card Header -->
+            <div class="khqr-header">
+              <div class="khqr-brand">
+                <div class="khqr-logo-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                    <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" fill="currentColor" stroke="none"/>
+                  </svg>
+                </div>
+                <span class="khqr-logo-text">KHQR</span>
+              </div>
+              <div class="aba-payway-badge">
+                <span class="aba-dot"></span>
+                <span>ABA PayWay</span>
+              </div>
             </div>
-          </div>
 
-          <!-- QR Code — rendered dynamically by qrcode.js -->
-          <div
-            id="qr-container"
-            class="qr-container"
-            role="img"
-            aria-label="ABA KHQR payment QR code"
-          >
-            <!-- Placeholder until JS renders the actual QR -->
-            <div class="qr-placeholder">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" fill="currentColor" stroke="none"/>
-              </svg>
-              <p>Loading QR…</p>
+            <!-- Inner Card -->
+            <div class="khqr-inner-card">
+              <div class="merchant-info">
+                <div class="merchant-name-en">SK COSMETIC</div>
+                <div class="merchant-name-kh">អេសខេ គ្រឿងក្រអូប</div>
+              </div>
+
+              <div class="payment-amount-display">
+                <div class="amount-label">Amount to Pay</div>
+                <div class="amount-value" id="amount-value">$ 0.00</div>
+              </div>
+
+              <div id="qr-container" class="qr-container" role="img" aria-label="ABA KHQR payment QR code">
+                <div class="qr-placeholder">
+                  <p>Loading QR…</p>
+                </div>
+              </div>
+
+              <div class="order-ref-badge">
+                <span id="order-ref-badge-text">—</span>
+              </div>
             </div>
-          </div>
 
-          <!-- Order reference badge -->
-          <div class="order-ref-badge" aria-label="Order reference">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-              <rect x="9" y="3" width="6" height="4" rx="1"/>
-            </svg>
-            <span id="order-ref-badge-text">—</span>
-          </div>
+          </div><!-- /khqr-outer-card -->
+        </div><!-- /khqr-card-section -->
 
-        </div><!-- /khqr-inner-card -->
-
-        <!-- Scan instruction -->
-        <p class="scan-instruction">
-          Open ABA Mobile &bull; Tap Scan &bull; Point camera at QR code
-        </p>
-
-      </div><!-- /khqr-outer-card -->
+      </div><!-- /right-content-wrapper -->
 
     </div><!-- /panel-right -->
 
@@ -278,7 +213,7 @@
 </div><!-- /#app -->
 
 <!-- Client logic — cache-busted on every deploy via ?v= timestamp -->
-<script src="/js/app.js?v=20260924_5"></script>
+<script src="/js/app.js?v=20260924_6"></script>
 
 </body>
 </html>

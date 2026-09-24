@@ -186,7 +186,7 @@
 
     if (!items || items.length === 0) {
       list.innerHTML = `
-        <div style="padding: 24px 12px; text-align: center; color: var(--gray-500); font-size: 0.85rem;">
+        <div style="padding: 24px 12px; text-align: center; color: #6C757D; font-size: 0.9rem;">
           No items in this order.
         </div>`;
       return;
@@ -202,18 +202,18 @@
       const cleanName = cleanItemName(item.name);
       const itemQty   = Number(item.qty || 1);
       const itemPrice = Number(item.price || 0);
-      // Support line_total if passed, or item.price directly
       const lineTotal = item.line_total !== undefined ? Number(item.line_total) : itemPrice;
-
-      // Support multiple field names Odoo may send for unit of measure
-      const unitLabel = item.uom || item.unit || item.uom_name || item.product_uom || '';
+      const unitLabel = item.uom || item.unit || item.uom_name || item.product_uom || 'ដើម';
+      const unitPrice = itemQty > 0 ? (lineTotal / itemQty) : lineTotal;
 
       row.innerHTML = `
-        <span class="item-name" title="${escapeHtml(cleanName)}">${escapeHtml(cleanName)}</span>
-        <span class="item-qty">
-          ×${itemQty}${unitLabel ? `<small class="item-unit">${escapeHtml(unitLabel)}</small>` : ''}
-        </span>
-        <span class="item-price">${sym}${formatAmount(lineTotal)}</span>
+        <div class="item-main-info">
+          <div class="item-name" title="${escapeHtml(cleanName)}">${escapeHtml(cleanName)}</div>
+          <div class="item-sub-detail">
+            <span class="item-qty-badge">${itemQty}</span> × ${sym} ${formatAmount(unitPrice)} / ${escapeHtml(unitLabel)}
+          </div>
+        </div>
+        <div class="item-line-total">${sym} ${formatAmount(lineTotal)}</div>
       `;
 
       fragment.appendChild(row);
@@ -266,16 +266,15 @@
     // Update total bar
     const sym = currencySymbol(data.currency);
     if (els.totalAmount) {
-      els.totalAmount.textContent = sym + formatAmount(data.amount_total || 0);
+      els.totalAmount.textContent = `${sym} ${formatAmount(data.amount_total || 0)}`;
     }
     if (els.totalCurrency) {
-      // Currency label is now embedded in the amount via symbol — clear text
       els.totalCurrency.textContent = '';
     }
 
     // Update KHQR inner card
     if (els.amountValue) {
-      els.amountValue.textContent = sym + formatAmount(data.amount_total || 0);
+      els.amountValue.textContent = `${sym} ${formatAmount(data.amount_total || 0)}`;
     }
     if (els.amountCurrency) {
       els.amountCurrency.textContent = '';
