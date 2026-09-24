@@ -24,6 +24,9 @@ export default async function handler(req, res) {
       storeId = 'pos_default';
     }
 
+    // Default KHQR string if none supplied in payload
+    const defaultQR = process.env.DEFAULT_KHQR_STRING || '00020101021238580016A000000770000001010800021600020300052045999530384054040.685802KH5911SK COSMETIC6010Phnom Penh63041234';
+
     // Standardize session data
     const sessionData = {
       status: payload.status || 'ACTIVE',
@@ -32,7 +35,7 @@ export default async function handler(req, res) {
       amount_total: Number(payload.amount_total !== undefined ? payload.amount_total : (payload.amount !== undefined ? payload.amount : 0)),
       currency: payload.currency || (payload.currency_id === 1 ? 'USD' : (payload.currency_id === 143 ? 'KHR' : 'USD')),
       items: Array.isArray(payload.items) ? payload.items : (Array.isArray(payload.order_lines) ? payload.order_lines : []),
-      qr_string: payload.qr_string || null,
+      qr_string: payload.qr_string || defaultQR,
       ...payload,
       updated_at: Date.now()
     };
