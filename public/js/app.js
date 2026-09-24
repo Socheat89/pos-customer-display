@@ -12,9 +12,16 @@
   "use strict";
 
   // ── Constants ──────────────────────────────────────────────
-  const POLL_INTERVAL_MS   = 1100;
-  const SUCCESS_RESET_MS   = 5000;
-  const STATUS_ENDPOINT    = "/api/status";
+  const POLL_INTERVAL_MS = 1100;
+  const SUCCESS_RESET_MS = 5000;
+
+  // Read ?store= from URL — each display screen has its own store ID.
+  // Example: https://your-app.vercel.app?store=store_a
+  const STORE_ID = new URLSearchParams(window.location.search).get("store") || "default";
+
+  // Append store param to every API call
+  const STATUS_ENDPOINT = `/api/status?store=${encodeURIComponent(STORE_ID)}`;
+  const RESET_ENDPOINT  = `/api/reset?store=${encodeURIComponent(STORE_ID)}`;
 
   // ── State ───────────────────────────────────────────────────
   let currentState    = "IDLE";  // 'IDLE' | 'PENDING' | 'SUCCESS'
@@ -270,9 +277,9 @@
 
     successTimer = setTimeout(async () => {
       clearInterval(countdownInterval);
-      // Reset state on the server so the display goes back to IDLE
+      // Reset only this store's session so the display returns to IDLE
       try {
-        await fetch("/api/reset", { method: "POST" });
+        await fetch(RESET_ENDPOINT, { method: "POST" });
       } catch (_) { /* non-critical */ }
       toIdle();
     }, SUCCESS_RESET_MS);
@@ -332,7 +339,7 @@
     showScreen("idle");
     currentState = "IDLE";
     startPolling();
-    console.log("[app] POS Customer Display initialised. Polling every", POLL_INTERVAL_MS, "ms.");
+    console.log(`[app] POS Customer Display initialised — store=${STORE_ID}, polling every ${POLL_INTERVAL_MS}ms.`);
   }
 
   // DOM ready guard
