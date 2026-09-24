@@ -335,9 +335,19 @@ html, body {
 
 /* KHQR Card Section below total */
 .khqr-card-section {
-  margin-top: 8px;
+  margin-top: 12px;
   display: flex;
   justify-content: center;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.khqr-card-section.hidden-qr {
+  display: none !important;
+  opacity: 0 !important;
+  transform: translateY(20px) !important;
+  pointer-events: none !important;
 }
 
 /* Decorative circles */

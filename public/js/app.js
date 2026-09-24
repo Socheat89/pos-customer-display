@@ -292,10 +292,11 @@
 
     if (khqrSection) {
       if (showQR) {
+        khqrSection.classList.remove("hidden-qr");
         khqrSection.classList.remove("hidden");
         khqrSection.style.display = "flex";
       } else {
-        khqrSection.classList.add("hidden");
+        khqrSection.classList.add("hidden-qr");
         khqrSection.style.display = "none";
       }
     }
