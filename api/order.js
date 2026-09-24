@@ -32,9 +32,14 @@ function generatePaywayHash({ req_time, merchant_id, tran_id, amount, items_base
  * Call ABA PayWay Sandbox / Production API to create transaction and fetch KHQR string / deeplink
  */
 async function fetchABAPaywayQR({ storeId, reference, amount, currency, items }) {
-  const merchantId = process.env.ABA_PAYWAY_MERCHANT_ID || 'ec478853';
-  const apiKey     = process.env.ABA_PAYWAY_API_KEY || 'C090910F64C4D5BE6BD7AADC443CA51BF29B3492';
+  const merchantId = process.env.ABA_PAYWAY_MERCHANT_ID;
+  const apiKey     = process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY;
   const apiUrl     = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
+
+  if (!merchantId || !apiKey) {
+    console.warn('[payway] Missing ABA_PAYWAY_MERCHANT_ID or ABA_PAYWAY_PUBLIC_KEY in Environment Variables');
+    return null;
+  }
 
   // Format amount to 2 decimal places
   const formattedAmount = Number(amount || 0).toFixed(2);
