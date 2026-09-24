@@ -166,6 +166,16 @@
   // ── Item List Rendering ───────────────────────────────────────
 
   /**
+   * Cleans item name by stripping leading quantity digits and newlines (e.g. "2\n150-បូ..." -> "150-បូ...")
+   * @param {string} name
+   * @returns {string}
+   */
+  function cleanItemName(name) {
+    if (!name) return "—";
+    return String(name).replace(/^\d+\s*[\r\n]+/, "").trim();
+  }
+
+  /**
    * Renders the items list into the left panel.
    * @param {Array<{name: string, qty: number, price: number}>} items
    * @param {string} currency
@@ -183,24 +193,27 @@
     }
 
     const fragment = document.createDocumentFragment();
-
     const sym = currencySymbol(currency);
 
     items.forEach((item) => {
       const row = document.createElement("div");
       row.className = "item-row";
 
-      const itemPrice = Number(item.price || 0);
+      const cleanName = cleanItemName(item.name);
       const itemQty   = Number(item.qty || 1);
+      const itemPrice = Number(item.price || 0);
+      // Support line_total if passed, or item.price directly
+      const lineTotal = item.line_total !== undefined ? Number(item.line_total) : itemPrice;
+
       // Support multiple field names Odoo may send for unit of measure
       const unitLabel = item.uom || item.unit || item.uom_name || item.product_uom || '';
 
       row.innerHTML = `
-        <span class="item-name" title="${escapeHtml(item.name || "")}">${escapeHtml(item.name || "—")}</span>
+        <span class="item-name" title="${escapeHtml(cleanName)}">${escapeHtml(cleanName)}</span>
         <span class="item-qty">
           ×${itemQty}${unitLabel ? `<small class="item-unit">${escapeHtml(unitLabel)}</small>` : ''}
         </span>
-        <span class="item-price">${sym}${formatAmount(itemPrice * itemQty)}</span>
+        <span class="item-price">${sym}${formatAmount(lineTotal)}</span>
       `;
 
       fragment.appendChild(row);
