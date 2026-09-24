@@ -1,0 +1,13 @@
+{
+  "name": "pos-customer-display",
+  "version": "1.0.0",
+  "description": "Odoo POS Customer-Facing Display with ABA KHQR payment integration, deployed on Vercel with Upstash Redis state management.",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=18.x"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.34.3"
+  }
+}

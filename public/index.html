@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="km" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+  <!-- SEO / Meta -->
+  <title>SK Cosmetic — Customer Display | ABA PayWay KHQR</title>
+  <meta name="description" content="POS Customer-Facing Display for SK Cosmetic. Presents live order details and ABA KHQR payment code for seamless checkout." />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- Prevent browser caching on kiosk displays -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%23E1251B'/><text x='12' y='17' text-anchor='middle' font-size='14' font-weight='900' fill='white' font-family='Arial'>S</text></svg>" />
+
+  <!-- Google Fonts (preconnect for performance) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="/css/style.css" />
+
+  <!-- qrcode.js — lightweight QR renderer (no build step required) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+          integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSuhUMNZGa6CVog3+p9zjf+6zON5fLk3H2TQ=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     APP SHELL
+     ══════════════════════════════════════════════════════════ -->
+<div id="app" role="main">
+
+  <!-- ╔══════════════════════════════════════════════════════╗
+       ║  SCREEN: IDLE — Welcome / Waiting for Order         ║
+       ╚══════════════════════════════════════════════════════╝ -->
+  <section id="screen-idle" aria-label="Welcome screen" aria-live="polite">
+
+    <div class="idle-logo-ring" aria-hidden="true">
+      <!-- Shopping bag icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <path d="M16 10a4 4 0 01-8 0"/>
+      </svg>
+    </div>
+
+    <div>
+      <h1 class="idle-store-name">
+        SK COSMETIC
+        <span>អេសខេ គ្រឿងក្រអូប</span>
+      </h1>
+    </div>
+
+    <p class="idle-tagline">
+      ស្វាគមន៍! សូមមើលទំនិញ ហើយស្កែន KHQR ដើម្បីបង់ប្រាក់។
+    </p>
+
+    <div class="idle-scan-indicator" aria-live="polite" aria-label="Waiting for order">
+      <span class="idle-dot" aria-hidden="true"></span>
+      <span>Waiting for order&hellip;</span>
+    </div>
+
+  </section>
+
+
+  <!-- ╔══════════════════════════════════════════════════════╗
+       ║  SCREEN: PENDING — Split Layout (Order + KHQR)      ║
+       ╚══════════════════════════════════════════════════════╝ -->
+  <section id="screen-pending" class="hidden" aria-label="Order and payment screen" aria-live="polite">
+
+    <!-- ── LEFT PANEL: Order Details (55%) ──────────────── -->
+    <div class="panel-left">
+
+      <!-- Header -->
+      <header class="left-header">
+        <div class="store-badge" aria-hidden="true">
+          <!-- Store icon -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <div class="left-header-text">
+          <h1>SK COSMETIC</h1>
+          <p>អេសខេ គ្រឿងក្រអូប</p>
+        </div>
+        <!-- Order reference chip (populated by JS) -->
+        <div class="order-ref-chip" id="order-ref-chip" aria-label="Order reference">—</div>
+      </header>
+
+      <!-- Items Section -->
+      <div class="items-section">
+
+        <div class="items-label">Order Summary</div>
+
+        <!-- Column headers -->
+        <div class="items-header-row" aria-hidden="true">
+          <span>Item</span>
+          <span style="text-align:center">Qty</span>
+          <span style="text-align:right">Amount</span>
+        </div>
+
+        <!-- Item rows injected by app.js -->
+        <div
+          id="items-list"
+          class="items-list"
+          role="list"
+          aria-label="Order items"
+          aria-live="polite"
+        >
+          <!-- Dynamic content -->
+        </div>
+
+      </div><!-- /items-section -->
+
+      <!-- Total Bar -->
+      <div class="total-bar" aria-label="Total amount">
+        <span class="total-label">Total Amount</span>
+        <div>
+          <span class="total-amount" id="total-amount">0.00</span>
+          <span class="total-currency" id="total-currency">USD</span>
+        </div>
+      </div>
+
+    </div><!-- /panel-left -->
+
+
+    <!-- ── RIGHT PANEL: ABA KHQR (45%) — template3_color ─── -->
+    <div class="panel-right">
+
+      <!--
+        ┌──────────────────────────────────┐
+        │   KHQR OUTER CARD (ABA Red)      │
+        │  ┌────────────────────────────┐  │
+        │  │   KHQR Inner White Card    │  │
+        │  └────────────────────────────┘  │
+        └──────────────────────────────────┘
+      -->
+      <div class="khqr-outer-card" role="region" aria-label="ABA KHQR payment card">
+
+        <!-- Outer Card Header -->
+        <div class="khqr-header">
+          <div class="khqr-brand">
+            <!-- KHQR logo icon -->
+            <div class="khqr-logo-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" fill="currentColor" stroke="none"/>
+              </svg>
+            </div>
+            <span class="khqr-logo-text">KHQR</span>
+          </div>
+
+          <!-- ABA PayWay badge -->
+          <div class="aba-payway-badge" aria-label="ABA PayWay">
+            <span class="aba-dot" aria-hidden="true"></span>
+            <span>ABA PayWay</span>
+          </div>
+        </div>
+
+        <!-- Inner White Card -->
+        <div class="khqr-inner-card">
+
+          <!-- Merchant name -->
+          <div class="merchant-info">
+            <div class="merchant-name-en">SK COSMETIC</div>
+            <div class="merchant-name-kh">អេសខេ គ្រឿងក្រអូប</div>
+          </div>
+
+          <!-- Payment amount display -->
+          <div class="payment-amount-display" aria-label="Payment amount">
+            <div class="amount-label">Amount to Pay</div>
+            <div>
+              <span class="amount-value" id="amount-value">0.00</span><span class="amount-currency-tag" id="amount-currency-tag">USD</span>
+            </div>
+          </div>
+
+          <!-- QR Code — rendered dynamically by qrcode.js -->
+          <div
+            id="qr-container"
+            class="qr-container"
+            role="img"
+            aria-label="ABA KHQR payment QR code"
+          >
+            <!-- Placeholder until JS renders the actual QR -->
+            <div class="qr-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" fill="currentColor" stroke="none"/>
+              </svg>
+              <p>Loading QR…</p>
+            </div>
+          </div>
+
+          <!-- Order reference badge -->
+          <div class="order-ref-badge" aria-label="Order reference">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+              <rect x="9" y="3" width="6" height="4" rx="1"/>
+            </svg>
+            <span id="order-ref-badge-text">—</span>
+          </div>
+
+        </div><!-- /khqr-inner-card -->
+
+        <!-- Scan instruction -->
+        <p class="scan-instruction">
+          Open ABA Mobile &bull; Tap Scan &bull; Point camera at QR code
+        </p>
+
+      </div><!-- /khqr-outer-card -->
+
+    </div><!-- /panel-right -->
+
+  </section><!-- /screen-pending -->
+
+
+  <!-- ╔══════════════════════════════════════════════════════╗
+       ║  SCREEN: SUCCESS — Payment Confirmed Overlay        ║
+       ╚══════════════════════════════════════════════════════╝ -->
+  <section id="screen-success" class="hidden" aria-label="Payment successful" aria-live="assertive">
+
+    <div class="success-card" role="status">
+
+      <!-- Animated green checkmark ring -->
+      <div class="success-icon-ring" aria-hidden="true">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M20 6L9 17l-5-5" />
+        </svg>
+      </div>
+
+      <!-- "Payment Successful!" — above "Thank You!" per reviewer requirement -->
+      <p class="success-payment-label" id="success-payment-label">
+        Payment Successful!
+      </p>
+
+      <!-- Main celebration heading -->
+      <h2 class="success-title">Thank You!</h2>
+
+      <!-- Subtitle -->
+      <p class="success-subtitle">
+        Your payment has been received.<br/>
+        Please collect your receipt.
+      </p>
+
+      <!-- Auto-reset countdown -->
+      <div class="success-countdown" aria-live="polite">
+        <span class="countdown-dot" aria-hidden="true"></span>
+        <span id="countdown-text">Returning in 5s…</span>
+      </div>
+
+    </div>
+
+  </section><!-- /screen-success -->
+
+</div><!-- /#app -->
+
+<!-- Client logic — loaded last so DOM is ready -->
+<script src="/js/app.js"></script>
+
+</body>
+</html>
