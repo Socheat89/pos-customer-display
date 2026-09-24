@@ -106,7 +106,6 @@
     container.innerHTML = "";
 
     if (!qrString) {
-      // Show placeholder when no QR string available
       container.innerHTML = `
         <div class="qr-placeholder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -120,20 +119,33 @@
       return;
     }
 
+    // 1. Primary: Try qrcode.js with CorrectLevel.L (handles up to 154 chars)
     try {
-      // qrcode.js creates a canvas element inside the container
       new QRCode(container, {
         text:           qrString,
         width:          180,
         height:         180,
         colorDark:      "#000000",
         colorLight:     "#ffffff",
-        correctLevel:   QRCode.CorrectLevel.M,
+        correctLevel:   QRCode.CorrectLevel.L,
       });
+      return;
     } catch (err) {
-      console.error("[QR] Failed to render QR code:", err);
-      container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
+      console.warn("[QR] qrcode.js overflow/error, switching to fallback renderer:", err);
+      container.innerHTML = "";
     }
+
+    // 2. Secondary: High-reliability QR Image endpoint fallback
+    const img = document.createElement("img");
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrString)}`;
+    img.alt = "ABA KHQR Payment Code";
+    img.style.width = "180px";
+    img.style.height = "180px";
+    img.style.borderRadius = "8px";
+    img.onerror = () => {
+      container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
+    };
+    container.appendChild(img);
   }
 
   // ── Item List Rendering ───────────────────────────────────────
