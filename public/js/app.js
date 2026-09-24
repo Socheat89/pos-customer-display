@@ -298,6 +298,10 @@
 
       const incoming = (data.status || "IDLE").toUpperCase();
 
+      // ── Debug log (visible in browser DevTools Console) ──
+      console.debug(`[poll] store=${STORE_ID} status=${incoming}`,
+        incoming !== "IDLE" ? `ref=${data.reference} total=${data.amount_total}` : '');
+
       switch (incoming) {
         case "IDLE":
           if (currentState !== "IDLE") toIdle();
@@ -318,10 +322,9 @@
           break;
 
         default:
-          console.warn("[app] Unknown status:", incoming);
+          console.warn("[poll] Unknown status:", incoming, data);
       }
     } catch (err) {
-      // Silently swallow network errors — display keeps last good state
       console.warn("[app] Poll error:", err.message);
     }
   }
@@ -338,8 +341,16 @@
     // All screens start hidden except idle
     showScreen("idle");
     currentState = "IDLE";
+
+    // Show active store on idle screen so staff can verify correct store
+    const storeEl = document.getElementById("idle-store-indicator");
+    if (storeEl) {
+      storeEl.textContent = `Store: ${STORE_ID}`;
+      storeEl.style.display = STORE_ID !== "default" ? "block" : "none";
+    }
+
     startPolling();
-    console.log(`[app] POS Customer Display initialised — store=${STORE_ID}, polling every ${POLL_INTERVAL_MS}ms.`);
+    console.log(`[app] Initialised — store=${STORE_ID} | polling every ${POLL_INTERVAL_MS}ms | endpoint=${STATUS_ENDPOINT}`);
   }
 
   // DOM ready guard

@@ -68,6 +68,9 @@
       <span>Waiting for order&hellip;</span>
     </div>
 
+    <!-- Store ID indicator — populated by app.js, helps verify correct store is active -->
+    <div class="idle-store-indicator" id="idle-store-indicator" aria-label="Active store"></div>
+
   </section>
 
 
@@ -274,8 +277,8 @@
 
 </div><!-- /#app -->
 
-<!-- Client logic — loaded last so DOM is ready -->
-<script src="/js/app.js"></script>
+<!-- Client logic — cache-busted on every deploy via ?v= timestamp -->
+<script src="/js/app.js?v=20260924"></script>
 
 </body>
 </html>

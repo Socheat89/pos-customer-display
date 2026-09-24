@@ -154,6 +154,20 @@ html, body {
   0%, 100% { opacity: 1; } 50% { opacity: 0.2; }
 }
 
+/* Small store-ID pill shown below the waiting indicator — helps staff verify the correct store */
+.idle-store-indicator {
+  display: none; /* shown via JS only when store != 'default' */
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(79,195,247,0.1);
+  border: 1px solid rgba(79,195,247,0.22);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--panel-accent);
+  letter-spacing: 0.5px;
+  margin-top: -8px;
+}
+
 /* =========================================================
    PENDING / SPLIT SCREEN
    ========================================================= */
