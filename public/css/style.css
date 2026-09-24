@@ -345,34 +345,42 @@ html, body {
 /* Total Bar */
 .total-bar {
   margin-top: 16px;
-  padding: 18px 20px;
+  padding: 20px 24px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--aba-red) 0%, var(--aba-red-dark) 100%);
+  background: linear-gradient(135deg, #E1251B 0%, #B81E15 60%, #8A1009 100%);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 4px 24px var(--aba-red-glow);
+  box-shadow: 0 6px 28px rgba(225, 37, 27, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.total-bar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(225, 37, 27, 0.5), inset 0 1px 0 rgba(255,255,255,0.25);
 }
 
 .total-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: rgba(255,255,255,0.8);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.9);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 1.2px;
 }
 
 .total-amount {
-  font-size: clamp(1.6rem, 3vw, 2.2rem);
-  font-weight: 800;
+  font-size: clamp(1.8rem, 3.4vw, 2.5rem);
+  font-weight: 900;
   color: var(--white);
   letter-spacing: -0.5px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .total-currency {
   font-size: 1rem;
-  font-weight: 500;
-  opacity: 0.8;
+  font-weight: 600;
+  opacity: 0.9;
   margin-left: 4px;
 }
 
