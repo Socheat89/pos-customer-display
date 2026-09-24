@@ -115,10 +115,28 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing field: amount_total" });
     }
 
-    // ── Store ID — prefer URL query param so Odoo URL controls it ─
-    // Example Odoo URL: https://pos-customer-display.vercel.app/api/order?store=pos_48002
-    const storeId = req.query.store || body.store_id || body.pos_id || "default";
-    const key     = sessionKey(storeId);
+    // ── Store ID resolution (priority order) ────────────────────
+    //
+    // 1. URL query param:  POST /api/order?store=pos_48002
+    // 2. body.store_id:    explicit field
+    // 3. body.config_id:   Odoo Many2one → [48002, "Store A"]  ← 1 Rule for ALL stores!
+    // 4. body.pos_id / body.shop_id
+    // 5. fallback:         "default"
+    //
+    let storeId = "default";
+    if (req.query.store) {
+      storeId = req.query.store;
+    } else if (body.store_id) {
+      storeId = body.store_id;
+    } else if (body.config_id) {
+      // Odoo Many2one field format: [id, "Display Name"]  or just integer
+      const cfgId = Array.isArray(body.config_id) ? body.config_id[0] : body.config_id;
+      storeId = `pos_${cfgId}`;
+    } else if (body.pos_id || body.shop_id) {
+      storeId = body.pos_id || body.shop_id;
+    }
+
+    const key = sessionKey(storeId);
 
     const sessionData = {
       status:       "PENDING",
