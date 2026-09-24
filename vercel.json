@@ -1,17 +1,6 @@
 {
   "version": 2,
   "name": "pos-customer-display",
-  "buildCommand": "echo 'No build step required'",
-  "outputDirectory": "public",
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/public/$1" }
-  ],
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "headers": [
     {
       "source": "/api/(.*)",
