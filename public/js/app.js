@@ -12,7 +12,7 @@
   "use strict";
 
   // ── Constants ──────────────────────────────────────────────
-  const POLL_INTERVAL_MS = 1100;
+  const POLL_INTERVAL_MS = 400;
   const SUCCESS_RESET_MS = 5000;
 
   // Read ?store= from URL — each display screen has its own store ID.
