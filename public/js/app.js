@@ -61,6 +61,16 @@
   }
 
   /**
+   * Returns currency symbol for display.
+   * @param {string} currency  e.g. 'USD', 'KHR', 'EUR'
+   * @returns {string}  e.g. '$', '៛', '€'
+   */
+  function currencySymbol(currency) {
+    const map = { USD: '$', KHR: '៛', EUR: '€', THB: '฿', SGD: 'S$', GBP: '£' };
+    return map[(currency || 'USD').toUpperCase()] || '$';
+  }
+
+  /**
    * Shows one screen, hides others. Uses CSS opacity + pointer-events.
    * @param {'idle'|'pending'|'success'} name
    */
@@ -139,17 +149,23 @@
 
     const fragment = document.createDocumentFragment();
 
+    const sym = currencySymbol(currency);
+
     items.forEach((item) => {
       const row = document.createElement("div");
       row.className = "item-row";
 
       const itemPrice = Number(item.price || 0);
       const itemQty   = Number(item.qty || 1);
+      // Support multiple field names Odoo may send for unit of measure
+      const unitLabel = item.uom || item.unit || item.uom_name || item.product_uom || '';
 
       row.innerHTML = `
         <span class="item-name" title="${escapeHtml(item.name || "")}">${escapeHtml(item.name || "—")}</span>
-        <span class="item-qty">×${itemQty}</span>
-        <span class="item-price">${formatAmount(itemPrice * itemQty)}</span>
+        <span class="item-qty">
+          ×${itemQty}${unitLabel ? `<small class="item-unit">${escapeHtml(unitLabel)}</small>` : ''}
+        </span>
+        <span class="item-price">${sym}${formatAmount(itemPrice * itemQty)}</span>
       `;
 
       fragment.appendChild(row);
@@ -200,19 +216,21 @@
     renderItems(data.items || [], data.currency);
 
     // Update total bar
+    const sym = currencySymbol(data.currency);
     if (els.totalAmount) {
-      els.totalAmount.textContent = formatAmount(data.amount_total || 0);
+      els.totalAmount.textContent = sym + formatAmount(data.amount_total || 0);
     }
     if (els.totalCurrency) {
-      els.totalCurrency.textContent = data.currency || "USD";
+      // Currency label is now embedded in the amount via symbol — clear text
+      els.totalCurrency.textContent = '';
     }
 
     // Update KHQR inner card
     if (els.amountValue) {
-      els.amountValue.textContent = formatAmount(data.amount_total || 0);
+      els.amountValue.textContent = sym + formatAmount(data.amount_total || 0);
     }
     if (els.amountCurrency) {
-      els.amountCurrency.textContent = data.currency || "USD";
+      els.amountCurrency.textContent = '';
     }
     if (els.orderRefBadge) {
       els.orderRefBadge.textContent = data.reference || "—";
