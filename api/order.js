@@ -21,7 +21,8 @@ function getFormattedReqTime() {
 
 /**
  * Generate HMAC-SHA512 signature hash for ABA PayWay API v2
- * Formula: req_time + merchant_id + tran_id + amount + items_base64 + payment_option
+ * Standard Hash String: req_time + merchant_id + tran_id + amount + items_base64 + shipping + firstname + lastname + email + phone + type + payment_option + currency + return_url + cancel_url + continue_success_url + return_deeplink + custom_fields + return_params
+ * Simplified KHQR Hash String: req_time + merchant_id + tran_id + amount + items_base64 + payment_option
  */
 function generatePaywayHash({ req_time, merchant_id, tran_id, amount, items_base64, payment_option, apiKey }) {
   const rawStr = req_time + merchant_id + tran_id + amount + items_base64 + payment_option;
@@ -46,8 +47,15 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
   const req_time = getFormattedReqTime();
   const tran_id = String(reference || `POS_${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 20);
 
+  // Format items array for ABA PayWay spec ({name, quantity, price})
+  const paywayItems = (items || []).map(i => ({
+    name: String(i.name || 'Item').replace(/^\d+\s*[\r\n]+/, '').trim(),
+    quantity: Number(i.qty || i.quantity || 1),
+    price: Number(i.price || 0)
+  }));
+
   // Encode items to Base64 JSON
-  const items_base64 = Buffer.from(JSON.stringify(items || [])).toString('base64');
+  const items_base64 = Buffer.from(JSON.stringify(paywayItems)).toString('base64');
   const payment_option = 'abapay_khqr';
 
   // Calculate HMAC-SHA512 hash
@@ -61,7 +69,12 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
     apiKey,
   });
 
-  // Prepare form payload
+  // Host callback URL
+  const callbackUrl = process.env.VERCEL_URL
+    ? Buffer.from(`https://${process.env.VERCEL_URL}/api/callback?store=${storeId}`).toString('base64')
+    : Buffer.from(`https://pos-customer-display.vercel.app/api/callback?store=${storeId}`).toString('base64');
+
+  // Prepare form payload exactly as specified in ABA PayWay documentation
   const formData = new URLSearchParams();
   formData.append('req_time', req_time);
   formData.append('merchant_id', merchantId);
@@ -70,13 +83,16 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
   formData.append('items', items_base64);
   formData.append('hash', hash);
   formData.append('firstname', 'SK');
-  formData.append('lastname', 'Customer');
+  formData.append('lastname', 'Cosmetic');
   formData.append('phone', '012345678');
   formData.append('email', 'pos@skcosmetic.com');
-  formData.append('return_params', storeId);
-  formData.append('type', 'purchase');
+  formData.append('purchase_type', 'purchase');
   formData.append('payment_option', payment_option);
   formData.append('currency', currency || 'USD');
+  formData.append('callback_url', callbackUrl);
+  formData.append('return_params', storeId);
+  formData.append('qr_image_template', 'template3_color');
+  formData.append('lifetime', '10');
 
   try {
     const response = await fetch(apiUrl, {
@@ -93,7 +109,7 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
       }
     }
   } catch (err) {
-    console.warn(`[payway] Failed to fetch ABA PayWay API, using fallback:`, err.message);
+    console.warn(`[payway] Failed to fetch ABA PayWay API:`, err.message);
   }
   return null;
 }
