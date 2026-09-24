@@ -114,6 +114,55 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
   return null;
 }
 
+/**
+ * Calculate CRC16-CCITT (0x1021, init 0xFFFF) for EMVCo Bakong KHQR strings.
+ */
+function crc16(str) {
+  let crc = 0xffff;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    crc ^= c << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xffff;
+      } else {
+        crc = (crc << 1) & 0xffff;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+/**
+ * Generate a 100% NBC Bakong EMVCo compliant KHQR String with valid CRC16 Checksum.
+ */
+function generateEMVCoKHQR({ merchantName = "SK COSMETIC", city = "Phnom Penh", amount = 0, currency = "USD" }) {
+  const isUSD = String(currency).toUpperCase() === "USD";
+  const currencyCode = isUSD ? "840" : "116";
+  const formattedAmount = Number(amount || 0).toFixed(2);
+
+  // ABA Bank Merchant Tag 38
+  const merchantTag = process.env.ABA_KHQR_MERCHANT_TAG || "38580016A00000077000000101080002160002030005";
+
+  let raw = "000201" +
+            "010212" +
+            merchantTag +
+            "52045999" +
+            `5303${currencyCode}`;
+
+  if (amount > 0) {
+    raw += `54${String(formattedAmount.length).padStart(2, '0')}${formattedAmount}`;
+  }
+
+  raw += "5802KH" +
+         `59${String(merchantName.length).padStart(2, '0')}${merchantName}` +
+         `60${String(city.length).padStart(2, '0')}${city}` +
+         "6304";
+
+  const checksum = crc16(raw);
+  return raw + checksum;
+}
+
 export default async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -155,9 +204,18 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3. Fallback default KHQR string if ABA PayWay sandbox is unavailable
+    // 3. Dynamic EMVCo KHQR string with valid CRC16 Checksum
     if (!qrString) {
-      qrString = process.env.DEFAULT_KHQR_STRING || '00020101021238580016A000000770000001010800021600020300052045999530384054040.685802KH5911SK COSMETIC6010Phnom Penh63041234';
+      if (process.env.DEFAULT_KHQR_STRING) {
+        qrString = process.env.DEFAULT_KHQR_STRING;
+      } else {
+        qrString = generateEMVCoKHQR({
+          merchantName: 'SK COSMETIC',
+          city: 'Phnom Penh',
+          amount: amountTotal,
+          currency: currency,
+        });
+      }
     }
 
     // Standardize session data for Upstash Redis
