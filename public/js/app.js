@@ -16,12 +16,13 @@
   const SUCCESS_RESET_MS = 5000;
 
   // Read ?store= from URL — each display screen has its own store ID.
-  // Example: https://your-app.vercel.app?store=store_a
-  const STORE_ID = new URLSearchParams(window.location.search).get("store") || "default";
+  // Example: https://your-app.vercel.app?store=pos_48002
+  const STORE_ID = new URLSearchParams(window.location.search).get("store") || "pos_default";
 
   // Append store param to every API call
   const STATUS_ENDPOINT = `/api/status?store=${encodeURIComponent(STORE_ID)}`;
   const RESET_ENDPOINT  = `/api/reset?store=${encodeURIComponent(STORE_ID)}`;
+
 
   // ── State ───────────────────────────────────────────────────
   let currentState    = "IDLE";  // 'IDLE' | 'PENDING' | 'SUCCESS'
@@ -307,8 +308,9 @@
           if (currentState !== "IDLE") toIdle();
           break;
 
+        case "ACTIVE":
         case "PENDING":
-          // Only re-render if just entering PENDING or reference changed
+          // Only re-render if just entering PENDING/ACTIVE or reference changed
           if (
             currentState !== "PENDING" ||
             (els.orderRefChip && els.orderRefChip.textContent !== data.reference)
@@ -318,6 +320,7 @@
           break;
 
         case "SUCCESS":
+        case "PAID":
           if (currentState !== "SUCCESS") toSuccess();
           break;
 
