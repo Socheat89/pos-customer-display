@@ -95,11 +95,16 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
   formData.append('lifetime', '10');
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString(),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
@@ -193,7 +198,20 @@ export default async function handler(req, res) {
     // 1. Direct qrString from payload (if Tampermonkey or client already called ABA PayWay)
     let qrString = payload.qrString || payload.qr_string || payload.qrImage || payload.qr_code || payload.qr || null;
 
-    // 2. Otherwise generate dynamic KHQR via ABA PayWay Sandbox / Production API
+    // Fast cache check: if this order already has a generated qr_string with same amount, reuse it instantly!
+    if (!qrString && amountTotal > 0) {
+      try {
+        const prevRaw = await redis.get(`pos_session_${storeId}`);
+        if (prevRaw) {
+          const prev = typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw;
+          if (prev && prev.reference === reference && Number(prev.amount_total) === amountTotal && prev.qr_string) {
+            qrString = prev.qr_string;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Otherwise generate dynamic KHQR via ABA PayWay Sandbox / Production API (1.5s max timeout)
     if (!qrString && amountTotal > 0) {
       qrString = await fetchABAPaywayQR({
         storeId,

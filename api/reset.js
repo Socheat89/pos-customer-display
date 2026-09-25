@@ -68,7 +68,7 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
 
   // Resolve store from query param (GET or POST)
-  const storeId = req.query.store || req.body?.store_id || "default";
+  const storeId = req.query.store || req.body?.store_id || "pos_default";
   const key     = sessionKey(storeId);
 
   // ── GET: reset and return HTML confirmation ──────────────────

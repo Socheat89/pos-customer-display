@@ -12,7 +12,7 @@
   "use strict";
 
   // ── Constants ──────────────────────────────────────────────
-  const POLL_INTERVAL_MS = 400;
+  const POLL_INTERVAL_MS = 250;
   const SUCCESS_RESET_MS = 5000;
 
   // Read ?store= from URL — each display screen has its own store ID.
@@ -25,10 +25,12 @@
 
 
   // ── State ───────────────────────────────────────────────────
-  let currentState    = "IDLE";  // 'IDLE' | 'PENDING' | 'SUCCESS'
-  let pollTimer       = null;
-  let successTimer    = null;
-  let isTransitioning = false;
+  let currentState      = "IDLE";  // 'IDLE' | 'PENDING' | 'SUCCESS'
+  let pollTimer         = null;
+  let successTimer      = null;
+  let isTransitioning   = false;
+  let isPolling         = false;
+  let lastDataSignature = "";
 
   // ── DOM References ──────────────────────────────────────────
   const screens = {
@@ -243,8 +245,9 @@
   function toIdle() {
     if (currentState === "IDLE") return;
     console.log("[app] → IDLE");
-    currentState    = "IDLE";
-    isTransitioning = false;
+    currentState      = "IDLE";
+    lastDataSignature = "";
+    isTransitioning   = false;
     clearTimeout(successTimer);
     showScreen("idle");
   }
@@ -254,7 +257,7 @@
    * @param {object} data  API /status response
    */
   function toPending(data) {
-    console.log("[app] → PENDING", data.reference);
+    console.log("[app] → PENDING", data.reference, "show_qr:", data.show_qr);
     currentState = "PENDING";
 
     // Update left panel
@@ -295,6 +298,9 @@
         khqrSection.classList.remove("hidden-qr");
         khqrSection.classList.remove("hidden");
         khqrSection.style.display = "flex";
+        setTimeout(() => {
+          khqrSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 60);
       } else {
         khqrSection.classList.add("hidden-qr");
         khqrSection.style.display = "none";
@@ -312,7 +318,8 @@
     if (isTransitioning) return;
     isTransitioning = true;
     console.log("[app] → SUCCESS");
-    currentState = "SUCCESS";
+    currentState      = "SUCCESS";
+    lastDataSignature = "";
 
     showScreen("success");
 
@@ -346,8 +353,15 @@
    * Single poll cycle — fetches /api/status and drives state machine.
    */
   async function poll() {
+    if (isPolling) return;
+    isPolling = true;
+
     try {
-      const res  = await fetch(STATUS_ENDPOINT, { cache: "no-store" });
+      const url  = `${STATUS_ENDPOINT}&_t=${Date.now()}`;
+      const res  = await fetch(url, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -355,7 +369,7 @@
 
       // ── Debug log (visible in browser DevTools Console) ──
       console.debug(`[poll] store=${STORE_ID} status=${incoming}`,
-        incoming !== "IDLE" ? `ref=${data.reference} total=${data.amount_total}` : '');
+        incoming !== "IDLE" ? `ref=${data.reference} total=${data.amount_total} show_qr=${data.show_qr}` : '');
 
       switch (incoming) {
         case "IDLE":
@@ -363,15 +377,16 @@
           break;
 
         case "ACTIVE":
-        case "PENDING":
-          // Only re-render if just entering PENDING/ACTIVE or reference changed
-          if (
-            currentState !== "PENDING" ||
-            (els.orderRefChip && els.orderRefChip.textContent !== data.reference)
-          ) {
+        case "PENDING": {
+          const showQR = Boolean(data.show_qr || data.is_payment || data.payment_mode);
+          const signature = `${data.reference || ''}_${data.amount_total || 0}_${showQR}_${data.qr_string || ''}_${(data.items || []).length}_${data.updated_at || ''}`;
+
+          if (currentState !== "PENDING" || signature !== lastDataSignature) {
+            lastDataSignature = signature;
             toPending(data);
           }
           break;
+        }
 
         case "SUCCESS":
         case "PAID":
@@ -383,6 +398,8 @@
       }
     } catch (err) {
       console.warn("[app] Poll error:", err.message);
+    } finally {
+      isPolling = false;
     }
   }
 
