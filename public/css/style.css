@@ -216,24 +216,27 @@ html, body {
   background: #F8F9FA;
   display: flex;
   flex-direction: column;
-  padding: 28px 32px;
+  padding: 24px 20px 0;  /* no bottom padding — total row sits flush */
   position: relative;
-  overflow-y: auto;
+  overflow: hidden;      /* prevent panel itself from scrolling */
 }
 
 .right-content-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 16px;
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   margin: 0 auto;
+  flex: 1;               /* fill remaining height */
+  min-height: 0;         /* allow flex children to shrink */
+  overflow: hidden;
 }
 
 .receipt-header {
   border-bottom: 2px solid #DEE2E6;
   padding-bottom: 12px;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .receipt-header h2 {
@@ -247,7 +250,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 280px;
+  flex: 1;               /* grow to fill space between header and total */
+  min-height: 0;         /* critical: allow shrink inside flex parent */
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -311,14 +315,15 @@ html, body {
   white-space: nowrap;
 }
 
-/* Receipt Total Row */
+/* Receipt Total Row — pinned at bottom of right panel */
 .receipt-total-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 0;
+  padding: 14px 0;
   border-top: 2px solid #0F172A;
   margin-top: 4px;
+  flex-shrink: 0;        /* never compress */
 }
 
 .receipt-total-label {
@@ -333,11 +338,14 @@ html, body {
   color: #E1251B;
 }
 
-/* KHQR Card Section below total */
+/* KHQR Card Section — shown below total, no extra bottom space */
 .khqr-card-section {
-  margin-top: 12px;
+  margin-top: 10px;
+  margin-bottom: 0;
   display: flex;
   justify-content: center;
+  flex-shrink: 0;
+  padding-bottom: 16px;  /* breathing room at very bottom only when QR shown */
   transition: opacity 0.35s ease, transform 0.35s ease;
   opacity: 1;
   transform: translateY(0);
@@ -369,174 +377,216 @@ html, body {
   background: radial-gradient(circle, rgba(225,37,27,0.1) 0%, transparent 70%);
 }
 
-/* ── KHQR Card (template3_color) ────────────────────────── */
-.khqr-outer-card {
-  width: 100%;
-  max-width: 340px;
-  border-radius: var(--radius-xl);
-  background: linear-gradient(160deg, var(--aba-red) 0%, #c41e15 55%, #9e180f 100%);
-  padding: 20px 20px 24px;
-  box-shadow: var(--shadow-glow-red);
-  position: relative;
-  z-index: 1;
-  animation: cardAppear 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes cardAppear {
-  from { opacity: 0; transform: scale(0.85) translateY(20px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* Card top sheen */
-.khqr-outer-card::before {
-  content: '';
+/* ── ABA KHQR Modal Popup Overlay (Matches ABA PayWay Design) ── */
+.khqr-modal-overlay {
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 50%;
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
-  pointer-events: none;
-}
-
-/* KHQR Card Header */
-.khqr-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  padding: 0 2px;
-}
-
-.khqr-brand {
-  display: flex; align-items: center; gap: 8px;
-}
-
-.khqr-logo-text {
-  font-size: 1.4rem;
-  font-weight: 900;
-  color: var(--white);
-  letter-spacing: -0.5px;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
-}
-
-.khqr-logo-icon {
-  width: 36px; height: 36px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.15);
-  backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  border: 1px solid rgba(255,255,255,0.25);
-}
-
-.khqr-logo-icon svg { width: 20px; height: 20px; color: var(--white); }
-
-.aba-payway-badge {
-  display: flex; align-items: center; gap: 6px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.18);
-  border: 1px solid rgba(255,255,255,0.3);
-  backdrop-filter: blur(4px);
-}
-
-.aba-payway-badge span {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--white);
-  letter-spacing: 0.5px;
-}
-
-.aba-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: #FFEB3B;
-  box-shadow: 0 0 6px #FFEB3B;
-}
-
-/* Inner White Card */
-.khqr-inner-card {
-  background: var(--white);
-  border-radius: var(--radius-lg);
-  padding: 20px 20px 16px;
+  inset: 0;
+  z-index: 90;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  box-shadow: var(--shadow-qr);
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.78); /* Dark slate backdrop */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 16px;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  opacity: 1;
+  visibility: visible;
 }
 
-.merchant-info {
-  text-align: center;
+.khqr-modal-overlay.hidden-modal {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ABA PayWay Top Right Watermark in Overlay */
+.khqr-modal-top-bar {
+  position: absolute;
+  top: 20px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.payway-top-brand {
+  font-family: var(--font-main);
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 1.1rem;
+  opacity: 0.95;
+}
+
+.payway-aba {
+  color: #FFFFFF;
+}
+
+.payway-text {
+  color: #FFFFFF;
+  letter-spacing: 1px;
+}
+
+/* Modal Card Window */
+.khqr-modal-card {
   width: 100%;
+  max-width: 320px;
+  background: #FFFFFF;
+  border-radius: 20px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+  padding: 20px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  animation: modalPopup 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.merchant-name-en {
-  font-size: 1.05rem;
+@keyframes modalPopup {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Modal Header: Title & Close Button */
+.khqr-modal-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.khqr-modal-title {
+  font-size: 1.15rem;
   font-weight: 800;
-  color: var(--gray-900);
+  color: #1E293B;
   letter-spacing: -0.3px;
 }
 
-.merchant-name-kh {
-  font-family: var(--font-khmer);
-  font-size: 0.8rem;
-  font-weight: 400;
-  color: var(--gray-500);
-  margin-top: 2px;
-}
-
-.payment-amount-display {
-  background: var(--gray-100);
-  border-radius: var(--radius-sm);
-  padding: 10px 20px;
-  text-align: center;
-  width: 100%;
-  border: 1px solid var(--gray-200);
-}
-
-.amount-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: var(--gray-500);
-}
-
-.amount-value {
-  font-size: 1.7rem;
-  font-weight: 800;
-  color: var(--aba-red);
-  letter-spacing: -0.5px;
-  line-height: 1.2;
-  margin-top: 2px;
-}
-
-.amount-currency-tag {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--gray-700);
-  margin-left: 4px;
-  vertical-align: super;
+.khqr-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
   line-height: 1;
+  color: #06B6D4; /* Cyan / Light blue close icon as in picture */
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: opacity 0.2s;
 }
 
-/* QR Code Container */
-.qr-container {
-  width: 190px; height: 190px;
+.khqr-modal-close:hover {
+  opacity: 0.7;
+}
+
+/* Official KHQR Ticket Container */
+.khqr-ticket {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+  border: 1px solid #E2E8F0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Red Banner on top with the official slanted cut corner on bottom-right */
+.khqr-ticket-banner {
+  background: #E1251B;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  border: 2px solid var(--gray-200);
-  background: var(--white);
   position: relative;
-  overflow: hidden;
+  /* Official KHQR cut: clip right side slightly diagonal */
+  clip-path: polygon(0 0, 100% 0, 100% 75%, 93% 100%, 0 100%);
+}
+
+.khqr-ticket-logo {
+  color: #FFFFFF;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+/* Ticket White Body */
+.khqr-ticket-body {
+  background: #FFFFFF;
+  padding: 14px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.khqr-ticket-merchant {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 2px;
+}
+
+.khqr-ticket-amount-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.khqr-ticket-amount {
+  font-size: 1.55rem;
+  font-weight: 900;
+  color: #0F172A;
+  letter-spacing: -0.5px;
+}
+
+.khqr-ticket-currency {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #64748B;
+}
+
+/* Dashed separator */
+.khqr-ticket-divider {
+  width: 100%;
+  border-top: 1.5px dashed #CBD5E1;
+  margin-bottom: 14px;
+}
+
+/* Centered QR wrapper */
+.khqr-ticket-qr-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-container {
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+  position: relative;
 }
 
 .qr-container canvas,
 .qr-container img {
-  width: 180px !important;
-  height: 180px !important;
+  width: 200px !important;
+  height: 200px !important;
+  display: block;
 }
 
 .qr-placeholder {
@@ -544,54 +594,39 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  color: var(--gray-500);
+  color: #94A3B8;
+  font-size: 0.75rem;
 }
 
-.qr-placeholder svg { width: 48px; height: 48px; opacity: 0.4; }
-.qr-placeholder p { font-size: 0.7rem; text-align: center; opacity: 0.6; }
-
-/* QR Corner decorations */
-.qr-container::before,
-.qr-container::after {
-  content: '';
+/* Official Center Badge inside QR ($ or ៛) */
+.qr-center-badge {
   position: absolute;
-  width: 16px; height: 16px;
-  border-color: var(--aba-red);
-  border-style: solid;
-  border-radius: 2px;
-}
-.qr-container::before { top: -1px; left: -1px; border-width: 3px 0 0 3px; }
-.qr-container::after  { bottom: -1px; right: -1px; border-width: 0 3px 3px 0; }
-
-/* Order Reference Badge */
-.order-ref-badge {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  background: #000000;
+  color: #FFFFFF;
+  border: 2px solid #FFFFFF;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: var(--gray-100);
-  border: 1px solid var(--gray-200);
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.95rem;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
-.order-ref-badge svg { width: 12px; height: 12px; color: var(--aba-red); flex-shrink: 0; }
-.order-ref-badge span {
+/* Explanatory text below ticket */
+.khqr-modal-instruction {
+  margin-top: 14px;
   font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--gray-700);
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Scan instruction */
-.scan-instruction {
-  font-size: 0.68rem;
-  color: rgba(255,255,255,0.65);
+  color: #64748B;
   text-align: center;
-  margin-top: 10px;
-  letter-spacing: 0.3px;
+  max-width: 230px;
+  line-height: 1.4;
 }
 
 /* =========================================================

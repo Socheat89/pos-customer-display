@@ -107,60 +107,78 @@
         <div class="receipt-total-row" aria-label="Total amount">
           <span class="receipt-total-label">Total</span>
           <span class="receipt-total-value" id="total-amount">$ 0.00</span>
+        </div><!-- /receipt-total-row -->
+
+      </div><!-- /right-content-wrapper -->
+
+    </div><!-- /panel-right -->
+
+    <!-- ── ABA KHQR Modal Popup (Matches Official ABA PayWay UI) ── -->
+    <div id="khqr-modal-overlay" class="khqr-modal-overlay hidden-modal" role="dialog" aria-modal="true" aria-labelledby="khqr-modal-title">
+      
+      <!-- Top Right ABA PayWay Logo watermark/header -->
+      <div class="khqr-modal-top-bar">
+        <div class="payway-top-brand">
+          <span class="payway-aba">ABA'</span>
+          <span class="payway-text">PAYWAY</span>
+        </div>
+      </div>
+
+      <!-- Main White Modal Window -->
+      <div class="khqr-modal-card">
+        
+        <!-- Modal Top Bar: Title & Close Button -->
+        <div class="khqr-modal-header">
+          <h3 id="khqr-modal-title" class="khqr-modal-title">ABA KHQR</h3>
+          <button type="button" class="khqr-modal-close" id="khqr-modal-close" aria-label="Close KHQR Popup">&times;</button>
         </div>
 
-        <!-- KHQR Card Container (Popup when Cashier enters Payment screen) -->
-        <div class="khqr-card-section hidden-qr" id="khqr-card-section">
-          <div class="khqr-outer-card" role="region" aria-label="ABA KHQR payment card">
+        <!-- Official Red & White KHQR Ticket Card -->
+        <div class="khqr-ticket">
+          
+          <!-- KHQR Red Banner with signature slanted bottom-right cut corner -->
+          <div class="khqr-ticket-banner">
+            <span class="khqr-ticket-logo">KHQR</span>
+          </div>
 
-            <!-- Outer Card Header -->
-            <div class="khqr-header">
-              <div class="khqr-brand">
-                <div class="khqr-logo-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                    <rect x="3" y="3" width="7" height="7" rx="1"/>
-                    <rect x="14" y="3" width="7" height="7" rx="1"/>
-                    <rect x="3" y="14" width="7" height="7" rx="1"/>
-                    <path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z" fill="currentColor" stroke="none"/>
-                  </svg>
-                </div>
-                <span class="khqr-logo-text">KHQR</span>
-              </div>
-              <div class="aba-payway-badge">
-                <span class="aba-dot"></span>
-                <span>ABA PayWay</span>
-              </div>
+          <!-- White Body of Ticket -->
+          <div class="khqr-ticket-body">
+            
+            <!-- Merchant Name -->
+            <div class="khqr-ticket-merchant" id="khqr-ticket-merchant">SK Cosmetic</div>
+
+            <!-- Price & Currency -->
+            <div class="khqr-ticket-amount-row">
+              <span class="khqr-ticket-amount" id="amount-value">0.00</span>
+              <span class="khqr-ticket-currency" id="amount-currency-tag">USD</span>
             </div>
 
-            <!-- Inner Card -->
-            <div class="khqr-inner-card">
-              <div class="merchant-info">
-                <div class="merchant-name-en">SK COSMETIC</div>
-                <div class="merchant-name-kh">អេសខេ គ្រឿងក្រអូប</div>
-              </div>
+            <!-- Dashed dividing line -->
+            <div class="khqr-ticket-divider"></div>
 
-              <div class="payment-amount-display">
-                <div class="amount-label">Amount to Pay</div>
-                <div class="amount-value" id="amount-value">$ 0.00</div>
-              </div>
-
+            <!-- Centered QR Code with Currency Symbol Badge -->
+            <div class="khqr-ticket-qr-wrapper">
               <div id="qr-container" class="qr-container" role="img" aria-label="ABA KHQR payment QR code">
                 <div class="qr-placeholder">
                   <p>Loading QR…</p>
                 </div>
               </div>
-
-              <div class="order-ref-badge">
-                <span id="order-ref-badge-text">—</span>
-              </div>
+              <!-- Center Badge inside QR ($ / ៛) -->
+              <div class="qr-center-badge" id="qr-center-badge">$</div>
             </div>
 
-          </div><!-- /khqr-outer-card -->
-        </div><!-- /khqr-card-section -->
+          </div><!-- /khqr-ticket-body -->
 
-      </div><!-- /right-content-wrapper -->
+        </div><!-- /khqr-ticket -->
 
-    </div><!-- /panel-right -->
+        <!-- Bottom instruction note -->
+        <p class="khqr-modal-instruction">
+          Scan with ABA Mobile, or other Mobile Banking App supporting KHQR
+        </p>
+
+      </div><!-- /khqr-modal-card -->
+
+    </div><!-- /khqr-modal-overlay -->
 
   </section><!-- /screen-pending -->
 
@@ -213,7 +231,7 @@
 </div><!-- /#app -->
 
 <!-- Client logic — cache-busted on every deploy via ?v= timestamp -->
-<script src="/js/app.js?v=20260925_3"></script>
+<script src="/js/app.js?v=20260925_5"></script>
 
 </body>
 </html>

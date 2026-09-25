@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      11.0
+// @version      12.0
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -312,113 +312,173 @@
         const STORE_ID  = getStoreId();
         const RESET_API = `${VERCEL_BASE}/api/reset?store=${STORE_ID}`;
 
-        // ១. បើស្ថិតលើផ្ទាំង Receipt (ការទូទាត់បានចប់សព្វគ្រប់)
-        const isReceipt = isReceiptScreenActive();
+        const pos = getOdooPos();
+
+        // ──────────────────────────────────────────────────────────
+        // A. ស្រង់ Screen Name ពី Odoo JS model (ត្រឹមត្រូវបំផុត)
+        // ──────────────────────────────────────────────────────────
+        let screenName = '';
+        try {
+            if (pos) {
+                // Odoo 17/18 OWL: mainScreen is a reactive object
+                if (pos.mainScreen?.component?.name) {
+                    screenName = pos.mainScreen.component.name;
+                } else if (typeof pos.mainScreen?.name === 'string') {
+                    screenName = pos.mainScreen.name;
+                }
+                // Fallback: screen_data on current order
+                if (!screenName) {
+                    const ord = pos.get_order?.();
+                    const sd  = ord?.get_screen_data?.() ?? ord?.screen_data;
+                    if (sd?.name) screenName = sd.name;
+                }
+            }
+        } catch (_) {}
+
+        // ──────────────────────────────────────────────────────────
+        // B. DOM fallback flags (ប្រើបន្ថែម មិនលើកឡើង)
+        // ──────────────────────────────────────────────────────────
+        const domHasReceipt  = Boolean(document.querySelector('.receipt-screen, .pos-receipt-container'));
+        const domHasPayment  = Boolean(document.querySelector(
+            '.payment-screen, .paymentlines, .paymentmethods, .payment-methods'
+        ));
+        // Validate button exists AND a payment method button exists (narrow check)
+        const hasValidateBtn = Boolean(document.querySelector(
+            'button.validate, .button.validate, button.validation'
+        ));
+        const hasPaymentMethodBtn = Boolean(document.querySelector(
+            '.paymentmethod, .payment-method, [data-method], .paymentmethods .button'
+        ));
+        const domPaymentStrict = domHasPayment || (hasValidateBtn && hasPaymentMethodBtn);
+
+        // ──────────────────────────────────────────────────────────
+        // C. ចាត់ប្រភេទ Screen (ផ្សំ JS Model + DOM Selectors)
+        // ──────────────────────────────────────────────────────────
+        const isPayment = screenName === 'PaymentScreen' || isPaymentScreenActive();
+        const isReceipt = (screenName === 'ReceiptScreen' || (!isPayment && isReceiptScreenActive())) && !isPayment;
+        const isProduct = !isReceipt && !isPayment;
+
+        console.log(`[POS Sync] store=${STORE_ID} screen="${screenName||'?'}" isPayment=${isPayment} isReceipt=${isReceipt}`);
+
+        // ──────────────────────────────────────────────────────────
+        // D. Receipt Screen → Reset & ត្រឡប់ IDLE (ម្ដង)
+        // ──────────────────────────────────────────────────────────
         if (isReceipt) {
-            cachedItems = [];
-            cachedTotal = 0;
-            cachedRef   = '';
+            if (!isCurrentlyReset) {
+                cachedItems      = [];
+                cachedTotal      = 0;
+                cachedRef        = '';
+                isCurrentlyReset = true;
+                lastKey          = '';
+                console.log('[POS Sync] ReceiptScreen → calling reset');
+                GM_xmlhttpRequest({ method: 'GET', url: RESET_API });
+            }
             return;
         }
 
-        const isPayment = isPaymentScreenActive();
-        const pos       = getOdooPos();
-
+        // ──────────────────────────────────────────────────────────
+        // E. ស្រង់ Items & Total
+        // ──────────────────────────────────────────────────────────
         let total = extractTotal(pos);
         let items = extractItems(pos);
 
-        // ធានាតម្លៃ Total តាមរយៈផលបូកជាក់ស្តែងនៃមុខទំនិញ (Auto Sum Fail-safe)
         const itemsSum = items.reduce((sum, i) => sum + (Number(i.line_total) || (Number(i.price) * Number(i.qty))), 0);
         if (itemsSum > 0 && (total === 0 || Math.abs(total - itemsSum) > 0.01)) {
             total = Math.round(itemsSum * 100) / 100;
         }
 
-        // ២. រក្សាទុកក្នុង Cache ឬ ស្រង់ចេញពី Cache ពេលស្ថិតលើផ្ទាំង Payment
+        // ──────────────────────────────────────────────────────────
+        // F. Cache Management
+        //    Payment screen → Odoo ដោះ DOM orderlines → ប្រើ Cache
+        // ──────────────────────────────────────────────────────────
         if (items.length > 0) {
             cachedItems = items;
+            cachedTotal = total > 0 ? total : cachedTotal;
         } else if (isPayment && cachedItems.length > 0) {
-            // លើផ្ទាំង Payment, Odoo ដោះ DOM .orderline ចេញ -> យកពី Cache មកវិញ!
             items = cachedItems;
+            if (total === 0) total = cachedTotal;
+            console.log(`[POS Sync] PaymentScreen: using cached items(${items.length}) total=$${total}`);
         }
 
-        if (total > 0) {
-            cachedTotal = total;
-        } else if (isPayment && cachedTotal > 0) {
-            total = cachedTotal;
-        }
+        if (total <= 0) total = cachedTotal;
 
-        // ៣. Auto Reset តែពេលនៅផ្ទាំងកន្ត្រកទំនិញ (Product Screen) ហើយកន្ត្រកពិតជាទទេ (total === 0)
-        if (!isPayment && (total === 0 || items.length === 0)) {
+        // ──────────────────────────────────────────────────────────
+        // G. Product Screen ហើយ Cart ទទេ → Reset
+        // ──────────────────────────────────────────────────────────
+        if (!isPayment && total === 0 && items.length === 0) {
             cachedItems = [];
             cachedTotal = 0;
             cachedRef   = '';
             if (!isCurrentlyReset && lastKey !== '') {
                 isCurrentlyReset = true;
                 lastKey = '';
+                console.log('[POS Sync] Empty cart → reset');
                 GM_xmlhttpRequest({ method: 'GET', url: RESET_API });
             }
             return;
         }
 
-        // ៤. ផ្ទាំង Payment ត្រូវបានបើក -> បង្ហាញ Popup KHQR (show_qr: true)
-        const showQR = isPayment;
-
-        // ៥. កំណត់ Order Reference ឱ្យថេរក្នុងមួយ Order
+        // ──────────────────────────────────────────────────────────
+        // H. Order Reference
+        // ──────────────────────────────────────────────────────────
         let orderRef = '';
-        if (pos) {
-            const order = pos.get_order?.();
-            if (order) orderRef = order.get_name?.() || order.name || '';
-        }
-        if (!orderRef) {
-            if (!cachedRef || (!isPayment && items.length === 0)) {
-                cachedRef = 'POS-' + Math.floor(1000 + Math.random() * 9000);
+        try {
+            if (pos) {
+                const order = pos.get_order?.();
+                if (order) orderRef = order.get_name?.() || order.name || '';
             }
+        } catch (_) {}
+
+        if (!orderRef) {
+            if (!cachedRef) cachedRef = 'POS-' + Math.floor(1000 + Math.random() * 9000);
             orderRef = cachedRef;
         } else {
             cachedRef = orderRef;
         }
 
-        // ៦. ផ្ទៀងផ្ទាត់ Key បើមានការផ្លាស់ប្តូរ ទើបបាញ់ Sync ទៅ Vercel
+        // ──────────────────────────────────────────────────────────
+        // I. Sync ទៅ Vercel តែប្រសិនបើ Key ផ្លាស់ប្ដូរ
+        // ──────────────────────────────────────────────────────────
+        const showQR   = isPayment;
         const itemsKey = items.map(i => `${i.name}_${i.qty}_${i.price}`).join('|');
-        const key = `${STORE_ID}_${total}_${showQR}_${itemsKey}_${orderRef}`;
+        const key      = `${STORE_ID}|${total}|${showQR}|${itemsKey}|${orderRef}`;
 
         if (total > 0 && key !== lastKey) {
-            lastKey = key;
+            lastKey          = key;
             isCurrentlyReset = false;
 
             const payload = {
-                store_id: STORE_ID,
-                name: orderRef,
-                reference: orderRef,
+                store_id:     STORE_ID,
+                name:         orderRef,
+                reference:    orderRef,
                 amount_total: total,
-                currency: 'USD',
-                items: items,
-                show_qr: showQR, // true ភ្លាមៗពេល Cashier ចុច Payment!
-                status: 'ACTIVE'
+                currency:     'USD',
+                items:        items,
+                show_qr:      showQR,
+                status:       'ACTIVE'
             };
 
+            console.log(`⚡ [POS→Vercel] store=${STORE_ID} showQR=${showQR} total=$${total} items=${items.length}`);
             GM_xmlhttpRequest({
                 method: 'POST',
                 url: VERCEL_API,
                 headers: { 'Content-Type': 'application/json' },
                 data: JSON.stringify(payload),
-                onload: function(res) {
-                    console.log(`⚡ [Odoo POS -> Vercel] Store: ${STORE_ID} | ShowQR: ${showQR} | Total: $${total} | Items: ${items.length}`);
-                },
                 onerror: function(err) {
-                    console.error(`❌ [Odoo POS -> Vercel] Sync failed:`, err);
+                    console.error('❌ [POS→Vercel] Sync failed:', err);
                 }
             });
         }
     }
 
-    // ពិនិត្យរៀងរាល់ 200ms
-    setInterval(checkPOS, 200);
+    // ពិនិត្យរៀងរាល់ 250ms
+    setInterval(checkPOS, 250);
 
-    // ចាប់យក Event Click ដើម្បី Sync ភ្លាមៗ (ចុច Payment, Validate, etc.)
-    document.addEventListener('click', function(e) {
-        setTimeout(checkPOS, 20);
-        setTimeout(checkPOS, 120);
+    // ចាប់ Event Click ដើម្បី Sync ភ្លាមៗ (ចុច Payment, Validate, etc.)
+    document.addEventListener('click', function() {
+        setTimeout(checkPOS, 30);
+        setTimeout(checkPOS, 200);
+        setTimeout(checkPOS, 500);
     });
 
 })();

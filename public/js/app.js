@@ -127,9 +127,8 @@
       const img = document.createElement("img");
       img.src = qrString;
       img.alt = "ABA KHQR Payment Code";
-      img.style.width = "180px";
-      img.style.height = "180px";
-      img.style.borderRadius = "8px";
+      img.style.width = "200px";
+      img.style.height = "200px";
       img.onerror = () => {
         container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
       };
@@ -141,8 +140,8 @@
     try {
       new QRCode(container, {
         text:           qrString,
-        width:          180,
-        height:         180,
+        width:          200,
+        height:         200,
         colorDark:      "#000000",
         colorLight:     "#ffffff",
         correctLevel:   QRCode.CorrectLevel.L,
@@ -155,11 +154,10 @@
 
     // 2. Secondary: High-reliability QR Image endpoint fallback
     const img = document.createElement("img");
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrString)}`;
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrString)}`;
     img.alt = "ABA KHQR Payment Code";
-    img.style.width = "180px";
-    img.style.height = "180px";
-    img.style.borderRadius = "8px";
+    img.style.width = "200px";
+    img.style.height = "200px";
     img.onerror = () => {
       container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
     };
@@ -277,37 +275,39 @@
       els.totalCurrency.textContent = '';
     }
 
-    // Update KHQR inner card
+    // Update ABA KHQR Modal Card fields
     if (els.amountValue) {
-      els.amountValue.textContent = `${sym} ${formatAmount(data.amount_total || 0)}`;
+      // Just the number as in screenshot: e.g. "600.00"
+      els.amountValue.textContent = formatAmount(data.amount_total || 0);
     }
     if (els.amountCurrency) {
-      els.amountCurrency.textContent = '';
+      els.amountCurrency.textContent = (data.currency || "USD").toUpperCase();
     }
-    if (els.orderRefBadge) {
-      els.orderRefBadge.textContent = data.reference || "—";
+    const merchantEl = document.getElementById("khqr-ticket-merchant");
+    if (merchantEl) {
+      merchantEl.textContent = data.merchant_name || "SK Cosmetic";
     }
 
-    // Toggle KHQR Card Popup visibility based on show_qr flag
-    const khqrSection = document.getElementById("khqr-card-section");
+    // Center badge in QR ($ or ៛)
+    const qrBadge = document.getElementById("qr-center-badge");
+    if (qrBadge) {
+      qrBadge.textContent = (data.currency || "USD").toUpperCase() === "KHR" ? "៛" : "$";
+    }
+
+    // Toggle ABA KHQR Modal Overlay visibility based on show_qr flag
+    const khqrModal = document.getElementById("khqr-modal-overlay");
     const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true;
 
-    if (khqrSection) {
+    if (khqrModal) {
       if (showQR) {
-        // Render QR code only when QR section is active
+        // Render QR code
         if (data.qr_string && data.qr_string !== lastRenderedQr) {
           lastRenderedQr = data.qr_string;
           renderQRCode(data.qr_string);
         }
-        khqrSection.classList.remove("hidden-qr");
-        khqrSection.classList.remove("hidden");
-        khqrSection.style.display = "flex";
-        setTimeout(() => {
-          khqrSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, 60);
+        khqrModal.classList.remove("hidden-modal");
       } else {
-        khqrSection.classList.add("hidden-qr");
-        khqrSection.style.display = "none";
+        khqrModal.classList.add("hidden-modal");
       }
     }
 
@@ -433,6 +433,15 @@
     if (storeEl) {
       storeEl.textContent = `Store: ${STORE_ID}`;
       storeEl.style.display = STORE_ID !== "default" ? "block" : "none";
+    }
+
+    // Setup close button on KHQR modal
+    const closeBtn = document.getElementById("khqr-modal-close");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        const modal = document.getElementById("khqr-modal-overlay");
+        if (modal) modal.classList.add("hidden-modal");
+      });
     }
 
     startPolling();
