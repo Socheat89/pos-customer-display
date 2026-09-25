@@ -431,14 +431,14 @@ html, body {
   letter-spacing: 1px;
 }
 
-/* Modal Card Window (+20% size for better scanning) */
+/* Modal Card Window (Optimized for Customer Facing Display: 500px max-width) */
 .khqr-modal-card {
   width: 100%;
-  max-width: 375px;
+  max-width: 500px;
   background: #FFFFFF;
-  border-radius: 24px;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
-  padding: 22px 22px 20px;
+  border-radius: 28px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+  padding: 28px 30px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -449,7 +449,7 @@ html, body {
 @keyframes modalPopup {
   from {
     opacity: 0;
-    transform: scale(0.92) translateY(14px);
+    transform: scale(0.92) translateY(16px);
   }
   to {
     opacity: 1;
@@ -463,11 +463,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .khqr-modal-title {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: #1E293B;
   letter-spacing: -0.3px;
@@ -476,12 +476,12 @@ html, body {
 .khqr-modal-close {
   background: none;
   border: none;
-  font-size: 1.6rem;
+  font-size: 2rem;
   line-height: 1;
   color: #06B6D4; /* Cyan / Light blue close icon as in picture */
   cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 2px 8px;
+  border-radius: 8px;
   transition: opacity 0.2s;
 }
 
@@ -492,10 +492,10 @@ html, body {
 /* Official KHQR Ticket Container */
 .khqr-ticket {
   width: 100%;
-  border-radius: 18px;
+  border-radius: 22px;
   overflow: hidden;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
-  border: 1px solid #E2E8F0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.1);
+  border: 1.5px solid #E2E8F0;
   display: flex;
   flex-direction: column;
 }
@@ -503,7 +503,7 @@ html, body {
 /* Red Banner on top with the official slanted cut corner on bottom-right */
 .khqr-ticket-banner {
   background: #E1251B;
-  height: 52px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -514,15 +514,15 @@ html, body {
 
 .khqr-ticket-logo {
   color: #FFFFFF;
-  font-size: 1.35rem;
+  font-size: 1.7rem;
   font-weight: 900;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
 }
 
 /* Ticket White Body */
 .khqr-ticket-body {
   background: #FFFFFF;
-  padding: 16px 16px 18px;
+  padding: 20px 22px 24px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -530,28 +530,29 @@ html, body {
 }
 
 .khqr-ticket-merchant {
-  font-size: 0.88rem;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 700;
   color: #475569;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .khqr-ticket-amount-row {
   display: flex;
   align-items: baseline;
-  gap: 6px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .khqr-ticket-amount {
-  font-size: 1.75rem;
+  font-size: 2.4rem;
   font-weight: 900;
   color: #0F172A;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.8px;
+  line-height: 1;
 }
 
 .khqr-ticket-currency {
-  font-size: 0.9rem;
+  font-size: 1.15rem;
   font-weight: 700;
   color: #64748B;
 }
@@ -559,11 +560,11 @@ html, body {
 /* Dashed separator */
 .khqr-ticket-divider {
   width: 100%;
-  border-top: 1.5px dashed #CBD5E1;
-  margin-bottom: 16px;
+  border-top: 2px dashed #CBD5E1;
+  margin-bottom: 20px;
 }
 
-/* Centered QR wrapper (+20% size: 240px) */
+/* Centered QR wrapper (Large Size: 340px) */
 .khqr-ticket-qr-wrapper {
   position: relative;
   width: 100%;
@@ -573,8 +574,8 @@ html, body {
 }
 
 .qr-container {
-  width: 240px;
-  height: 240px;
+  width: 340px;
+  height: 340px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -584,8 +585,8 @@ html, body {
 
 .qr-container canvas,
 .qr-container img {
-  width: 240px !important;
-  height: 240px !important;
+  width: 340px !important;
+  height: 340px !important;
   display: block;
 }
 
@@ -593,9 +594,9 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   color: #94A3B8;
-  font-size: 0.75rem;
+  font-size: 0.95rem;
 }
 
 /* Official Center Badge inside QR ($ or ៛) */
@@ -604,29 +605,29 @@ html, body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   background: #000000;
   color: #FFFFFF;
-  border: 2.5px solid #FFFFFF;
+  border: 3px solid #FFFFFF;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 900;
-  font-size: 1.05rem;
+  font-size: 1.35rem;
   pointer-events: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 /* Explanatory text below ticket */
 .khqr-modal-instruction {
-  margin-top: 14px;
-  font-size: 0.76rem;
+  margin-top: 18px;
+  font-size: 0.92rem;
   color: #64748B;
   text-align: center;
-  max-width: 260px;
-  line-height: 1.4;
+  max-width: 340px;
+  line-height: 1.5;
 }
 
 /* =========================================================
