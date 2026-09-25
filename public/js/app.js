@@ -382,12 +382,21 @@
 
         case "ACTIVE":
         case "PENDING": {
+          const itemsList = data.items || [];
+          const totalAmt  = Number(data.amount_total || 0);
+
+          // If session has no items AND total is 0, display must be in IDLE welcome state!
+          if (itemsList.length === 0 && totalAmt === 0) {
+            if (currentState !== "IDLE") toIdle();
+            break;
+          }
+
           const showQR = Boolean(data.show_qr || data.is_payment || data.payment_mode);
           const currentJson = JSON.stringify({
             status: incoming,
             ref: data.reference || '',
-            total: Number(data.amount_total || 0),
-            items: data.items || [],
+            total: totalAmt,
+            items: itemsList,
             show_qr: showQR,
             qr: data.qr_string || '',
             updated: data.updated_at || 0
