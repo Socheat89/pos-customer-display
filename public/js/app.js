@@ -30,7 +30,8 @@
   let successTimer      = null;
   let isTransitioning   = false;
   let isPolling         = false;
-  let lastDataSignature = "";
+  let lastRenderedJson  = "";
+  let lastRenderedQr    = "";
 
   // ── DOM References ──────────────────────────────────────────
   const screens = {
@@ -246,7 +247,8 @@
     if (currentState === "IDLE") return;
     console.log("[app] → IDLE");
     currentState      = "IDLE";
-    lastDataSignature = "";
+    lastRenderedJson  = "";
+    lastRenderedQr    = "";
     isTransitioning   = false;
     clearTimeout(successTimer);
     showScreen("idle");
@@ -257,7 +259,7 @@
    * @param {object} data  API /status response
    */
   function toPending(data) {
-    console.log("[app] → PENDING", data.reference, "show_qr:", data.show_qr);
+    console.log("[app] → PENDING", data.reference, "items:", (data.items || []).length, "total:", data.amount_total, "show_qr:", data.show_qr);
     currentState = "PENDING";
 
     // Update left panel
@@ -286,15 +288,17 @@
       els.orderRefBadge.textContent = data.reference || "—";
     }
 
-    // Render QR code
-    renderQRCode(data.qr_string || null);
-
     // Toggle KHQR Card Popup visibility based on show_qr flag
     const khqrSection = document.getElementById("khqr-card-section");
     const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true;
 
     if (khqrSection) {
       if (showQR) {
+        // Render QR code only when QR section is active
+        if (data.qr_string && data.qr_string !== lastRenderedQr) {
+          lastRenderedQr = data.qr_string;
+          renderQRCode(data.qr_string);
+        }
         khqrSection.classList.remove("hidden-qr");
         khqrSection.classList.remove("hidden");
         khqrSection.style.display = "flex";
@@ -379,10 +383,18 @@
         case "ACTIVE":
         case "PENDING": {
           const showQR = Boolean(data.show_qr || data.is_payment || data.payment_mode);
-          const signature = `${data.reference || ''}_${data.amount_total || 0}_${showQR}_${data.qr_string || ''}_${(data.items || []).length}_${data.updated_at || ''}`;
+          const currentJson = JSON.stringify({
+            status: incoming,
+            ref: data.reference || '',
+            total: Number(data.amount_total || 0),
+            items: data.items || [],
+            show_qr: showQR,
+            qr: data.qr_string || '',
+            updated: data.updated_at || 0
+          });
 
-          if (currentState !== "PENDING" || signature !== lastDataSignature) {
-            lastDataSignature = signature;
+          if (currentState !== "PENDING" || currentJson !== lastRenderedJson) {
+            lastRenderedJson = currentJson;
             toPending(data);
           }
           break;

@@ -180,33 +180,44 @@
     function extractTotal(pos) {
         // ១. ស្រង់ពី Odoo POS Object
         if (pos) {
-            const order = pos.get_order?.();
-            if (order) {
-                const total = order.get_total_with_tax?.() ?? order.get_total?.();
-                if (typeof total === 'number' && total > 0) return total;
+            try {
+                const order = pos.get_order?.();
+                if (order) {
+                    const total = order.get_total_with_tax?.() ?? order.get_total?.();
+                    if (typeof total === 'number' && total > 0) return total;
+                }
+            } catch (_) {}
+        }
+
+        // ២. ស្វែងរក Total Element ក្នុង Odoo POS (Product Screen & Payment Screen)
+        const totalSelectors = [
+            '.order-summary .total',
+            '.order-summary .amount',
+            '.order-summary .value',
+            '.order-summary',
+            '.pads .subentry .value',
+            '.payment-screen .total',
+            '.paymentlines-container',
+            '.pay .amount'
+        ];
+        for (const sel of totalSelectors) {
+            const els = document.querySelectorAll(sel);
+            for (const el of els) {
+                const m = (el.innerText || '').match(/\$\s*([0-9]+\.[0-9]{2})/);
+                if (m) {
+                    const val = parseFloat(m[1]);
+                    if (val > 0) return val;
+                }
             }
         }
 
-        // ២. ស្រង់ពី DOM (Header $ 2.18 ឬ Paymentlines)
+        // ៣. ស្វែងរកទូទៅដែលមានពាក្យ "Total" ឬ "$" ក្នុង DOM
         let maxTotal = 0;
-        const candidates = document.querySelectorAll(
-            '.payment-screen .total, .paymentlines-container, .pos-content header, .pos-topheader, .pay .amount, .total .value, .subentry .value'
-        );
-        for (const el of candidates) {
-            const match = (el.innerText || '').match(/\$\s*([0-9]+\.[0-9]{2})/);
-            if (match) {
-                const val = parseFloat(match[1]);
-                if (val > maxTotal) maxTotal = val;
-            }
-        }
-        if (maxTotal > 0) return maxTotal;
-
-        // ៣. ស្វែងរកទូទៅក្នុង DOM
         const all = document.querySelectorAll('div, span, button');
         for (const el of all) {
             if (el.closest('.products-widget') || el.closest('.product-list')) continue;
             const txt = (el.innerText || '').trim();
-            const match = txt.match(/^\$\s*([0-9]+\.[0-9]{2})$/);
+            const match = txt.match(/\$\s*([0-9]+\.[0-9]{2})/);
             if (match) {
                 const val = parseFloat(match[1]);
                 if (val > maxTotal) maxTotal = val;
@@ -315,6 +326,12 @@
 
         let total = extractTotal(pos);
         let items = extractItems(pos);
+
+        // ធានាតម្លៃ Total តាមរយៈផលបូកជាក់ស្តែងនៃមុខទំនិញ (Auto Sum Fail-safe)
+        const itemsSum = items.reduce((sum, i) => sum + (Number(i.line_total) || (Number(i.price) * Number(i.qty))), 0);
+        if (itemsSum > 0 && (total === 0 || Math.abs(total - itemsSum) > 0.01)) {
+            total = Math.round(itemsSum * 100) / 100;
+        }
 
         // ២. រក្សាទុកក្នុង Cache ឬ ស្រង់ចេញពី Cache ពេលស្ថិតលើផ្ទាំង Payment
         if (items.length > 0) {
