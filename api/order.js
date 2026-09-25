@@ -228,7 +228,7 @@ export default async function handler(req, res) {
         qrString = process.env.DEFAULT_KHQR_STRING;
       } else {
         qrString = generateEMVCoKHQR({
-          merchantName: 'SK COSMETIC',
+          merchantName: 'SK STORE',
           city: 'Phnom Penh',
           amount: amountTotal,
           currency: currency,

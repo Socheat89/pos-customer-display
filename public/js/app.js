@@ -285,7 +285,7 @@
     }
     const merchantEl = document.getElementById("khqr-ticket-merchant");
     if (merchantEl) {
-      merchantEl.textContent = data.merchant_name || "SK Cosmetic";
+      merchantEl.textContent = data.merchant_name || "SK STORE";
     }
 
     // Center badge in QR ($ or ៛)
