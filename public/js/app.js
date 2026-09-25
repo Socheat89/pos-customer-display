@@ -127,8 +127,8 @@
       const img = document.createElement("img");
       img.src = qrString;
       img.alt = "ABA KHQR Payment Code";
-      img.style.width = "200px";
-      img.style.height = "200px";
+      img.style.width = "240px";
+      img.style.height = "240px";
       img.onerror = () => {
         container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
       };
@@ -140,8 +140,8 @@
     try {
       new QRCode(container, {
         text:           qrString,
-        width:          200,
-        height:         200,
+        width:          240,
+        height:         240,
         colorDark:      "#000000",
         colorLight:     "#ffffff",
         correctLevel:   QRCode.CorrectLevel.L,
@@ -154,10 +154,10 @@
 
     // 2. Secondary: High-reliability QR Image endpoint fallback
     const img = document.createElement("img");
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrString)}`;
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrString)}`;
     img.alt = "ABA KHQR Payment Code";
-    img.style.width = "200px";
-    img.style.height = "200px";
+    img.style.width = "240px";
+    img.style.height = "240px";
     img.onerror = () => {
       container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
     };
