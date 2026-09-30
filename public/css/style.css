@@ -428,33 +428,7 @@ html, body {
   }
 }
 
-/* Floating Dismiss Button */
-.t3-close-btn {
-  position: absolute;
-  top: -12px;
-  right: -16px;
-  width: 32px;
-  height: 32px;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 50%;
-  font-size: 1.35rem;
-  line-height: 1;
-  color: #FFFFFF;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  z-index: 20;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
 
-.t3-close-btn:hover {
-  background: rgba(255, 255, 255, 0.4);
-  transform: scale(1.08);
-}
 
 /* Official ABA' PAY Wordmarks Centered Above Ticket */
 .t3-brand-header {
