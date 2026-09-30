@@ -104,11 +104,13 @@
    */
   function renderQRCode(qrString) {
     const container = els.qrContainer;
+    const centerBadge = document.getElementById("qr-center-badge");
 
     // Clear previous contents
     container.innerHTML = "";
 
     if (!qrString) {
+      if (centerBadge) centerBadge.style.display = "none";
       container.innerHTML = `
         <div class="qr-placeholder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -122,14 +124,15 @@
       return;
     }
 
-    // Direct Base64 Image support (e.g. ABA PayWay qrImage)
+    // Direct Base64 Image support (e.g. ABA PayWay official qrImage)
     if (typeof qrString === "string" && (qrString.startsWith("data:image/") || qrString.startsWith("http://") || qrString.startsWith("https://"))) {
+      if (centerBadge) centerBadge.style.display = "none";
       const img = document.createElement("img");
       img.src = qrString;
       img.alt = "ABA KHQR Payment Code";
       img.className = "pw-khqr-qr-image";
-      img.style.width = "220px";
-      img.style.height = "220px";
+      img.style.width = "216px";
+      img.style.height = "216px";
       img.onerror = () => {
         container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
       };
@@ -137,29 +140,45 @@
       return;
     }
 
-    // 1. Primary: Try qrcode.js with CorrectLevel.L (handles up to 154 chars)
+    // Show center badge for dynamic QR
+    if (centerBadge) centerBadge.style.display = "block";
+
+    // 1. Primary: Try qrcode.js with CorrectLevel.M for KHQR compliance & center logo protection
     try {
       new QRCode(container, {
         text:           qrString,
-        width:          220,
-        height:         220,
+        width:          216,
+        height:         216,
         colorDark:      "#000000",
         colorLight:     "#ffffff",
-        correctLevel:   QRCode.CorrectLevel.L,
+        correctLevel:   QRCode.CorrectLevel.M,
       });
       return;
     } catch (err) {
-      console.warn("[QR] qrcode.js overflow/error, switching to fallback renderer:", err);
+      console.warn("[QR] qrcode.js overflow with level M, trying Level L:", err);
       container.innerHTML = "";
+      try {
+        new QRCode(container, {
+          text:           qrString,
+          width:          216,
+          height:         216,
+          colorDark:      "#000000",
+          colorLight:     "#ffffff",
+          correctLevel:   QRCode.CorrectLevel.L,
+        });
+        return;
+      } catch (err2) {
+        console.warn("[QR] qrcode.js fallback error:", err2);
+      }
     }
 
     // 2. Secondary: High-reliability QR Image endpoint fallback
     const img = document.createElement("img");
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrString)}`;
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=216x216&data=${encodeURIComponent(qrString)}`;
     img.alt = "ABA KHQR Payment Code";
     img.className = "pw-khqr-qr-image";
-    img.style.width = "220px";
-    img.style.height = "220px";
+    img.style.width = "216px";
+    img.style.height = "216px";
     img.onerror = () => {
       container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
     };
@@ -301,11 +320,11 @@
     const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true;
 
     if (khqrModal) {
-      if (showQR) {
-        // Render QR code
-        if (data.qr_string && data.qr_string !== lastRenderedQr) {
-          lastRenderedQr = data.qr_string;
-          renderQRCode(data.qr_string);
+        // Render QR code from qr_image (Base64) or qr_string
+        const qrPayload = data.qr_image || data.qr_string;
+        if (qrPayload && qrPayload !== lastRenderedQr) {
+          lastRenderedQr = qrPayload;
+          renderQRCode(qrPayload);
         }
         khqrModal.classList.remove("hidden-modal");
       } else {

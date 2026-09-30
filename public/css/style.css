@@ -401,21 +401,23 @@ html, body {
   pointer-events: none !important;
 }
 
-/* Modal Card Container (White Card per PayWay Guidelines) */
-.pw-card {
+/* =========================================================
+   OFFICIAL ABA PAYWAY template3_color SPECIFICATION
+   ========================================================= */
+
+/* Template 3 Popup Wrapper (Centers the card on dark backdrop) */
+.t3-modal-wrapper {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
-  max-width: 360px;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 24px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
-  padding: 28px 24px 22px;
-  animation: modalPopup 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 276px;
+  animation: t3Popup 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
 }
 
-@keyframes modalPopup {
+@keyframes t3Popup {
   from {
     opacity: 0;
     transform: scale(0.92) translateY(14px);
@@ -426,140 +428,141 @@ html, body {
   }
 }
 
-/* Modal Dismiss Button */
-.khqr-modal-close {
+/* Floating Dismiss Button */
+.t3-close-btn {
   position: absolute;
-  top: 14px;
-  right: 16px;
+  top: -12px;
+  right: -16px;
   width: 32px;
   height: 32px;
-  background: #F1F5F9;
-  border: none;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 50%;
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   line-height: 1;
-  color: #64748B;
+  color: #FFFFFF;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, transform 0.15s;
-  z-index: 10;
+  transition: all 0.2s ease;
+  z-index: 20;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.khqr-modal-close:hover {
-  background: #E2E8F0;
-  color: #0F172A;
-  transform: scale(1.06);
+.t3-close-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(1.08);
 }
 
-/* Official KHQR template3_color Layout */
-.pw-khqr {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  margin: 0 auto;
-}
-
-/* ABA' PAY Wordmarks Centered Above Ticket */
-.pw-khqr-wordmarks {
+/* Official ABA' PAY Wordmarks Centered Above Ticket */
+.t3-brand-header {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 8px;
-  padding-bottom: 20px;
-}
-
-.pw-khqr-wordmarks img.wm1 {
-  height: 38px;
-  width: auto;
-  display: block;
-}
-
-.pw-khqr-wordmarks img.wm2 {
-  height: 32px;
-  width: auto;
-  display: block;
-}
-
-/* Official Red & White KHQR Ticket Card */
-.pw-khqr-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  overflow: hidden;
-  width: 100%;
-  max-width: 300px;
-  border: 1px solid #E2E8F0;
-  border-radius: 18px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  gap: 7px;
+  margin-bottom: 14px;
   background: #FFFFFF;
+  padding: 6px 18px 7px;
+  border-radius: 9999px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
 }
 
-/* Official Red Ribbon with Chamfer Cut & White KHQR Logo */
-.pw-khqr-ribbon {
+.t3-brand-header img.t3-wm1 {
+  height: 28px;
+  width: auto;
+  display: block;
+}
+
+.t3-brand-header img.t3-wm2 {
+  height: 24px;
+  width: auto;
+  display: block;
+}
+
+/* Official template3_color Single White Card */
+.t3-card {
   position: relative;
   width: 100%;
-  height: 80px;
-}
-
-.pw-khqr-ribbon img {
-  width: 100%;
-  height: 80px;
-  display: block;
-  object-fit: fill;
-}
-
-/* Merchant Info: Name + Amount */
-.pw-khqr-merchant {
-  width: 100%;
-  text-align: left;
-  padding: 6px 24px 12px;
+  background: #FFFFFF;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-sizing: border-box;
 }
 
-.pw-khqr-merchant-name {
-  font-size: 15px;
-  font-weight: 500;
-  color: #64748B;
-  margin: 0 0 3px 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
-}
-
-.pw-khqr-amount {
-  font-size: 26px;
-  font-weight: 700;
-  color: #0F172A;
-  margin: 0;
-  letter-spacing: -0.5px;
-  line-height: 1.15;
-}
-
-/* Dashed divider line across ticket */
-.pw-khqr-divider {
-  width: 100%;
-  height: 1px;
-  background-image: repeating-linear-gradient(to right, #CBD5E1 0, #CBD5E1 8px, transparent 8px, transparent 14px);
-}
-
-/* QR Code Wrapper with Bakong Center Badge */
-.pw-khqr-qr-wrap {
+/* Official Red Ribbon Banner with Signature Chamfer Cut & Centered KHQR Logo */
+.t3-banner {
   position: relative;
-  width: 220px;
-  height: 220px;
-  margin: 18px auto 20px;
+  width: 100%;
+  height: 52px;
+  background: #E1251B;
+  /* Official diagonal chamfer cut on bottom-right corner */
+  clip-path: polygon(0 0, 100% 0, 100% 48%, 84% 100%, 0 100%);
+  -webkit-clip-path: polygon(0 0, 100% 0, 100% 48%, 84% 100%, 0 100%);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.qr-container {
-  width: 220px;
-  height: 220px;
+.t3-khqr-logo {
+  height: 18px;
+  width: auto;
+  display: block;
+}
+
+/* Merchant Info: Left-aligned to match QR Code */
+.t3-merchant-box {
+  padding: 16px 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.t3-merchant-name {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #374151;
+  margin: 0 0 2px 0;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.t3-amount {
+  font-size: 25px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* Dashed divider line across ticket */
+.t3-dashed-divider {
+  width: calc(100% - 40px);
+  margin: 12px 20px 14px;
+  border-top: 1.5px dashed #D1D5DB;
+}
+
+/* QR Code Box */
+.t3-qr-wrap {
+  position: relative;
+  width: 216px;
+  height: 216px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.t3-qr-container {
+  width: 216px;
+  height: 216px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -567,12 +570,13 @@ html, body {
   position: relative;
 }
 
-.qr-container canvas,
-.qr-container img,
+.t3-qr-container canvas,
+.t3-qr-container img,
 .pw-khqr-qr-image {
-  width: 220px !important;
-  height: 220px !important;
+  width: 216px !important;
+  height: 216px !important;
   display: block;
+  border-radius: 4px;
 }
 
 .qr-placeholder {
@@ -584,27 +588,30 @@ html, body {
   font-size: 0.9rem;
 }
 
-/* Official Red Bakong Emblem Badge in center of QR */
-.pw-khqr-corner-mark {
+/* Official Circular Red Bakong Emblem Badge centered in QR */
+.t3-bakong-badge {
   position: absolute;
-  left: 50%;
   top: 50%;
+  left: 50%;
   width: 44px;
   height: 44px;
-  border-radius: 9999px;
+  border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
   filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.25));
+  z-index: 5;
 }
 
-/* Caption note below ticket */
-.pw-khqr-caption {
+/* Official footer caption below ticket */
+.t3-caption {
   text-align: center;
-  color: #64748B;
-  font-size: 13.5px;
-  padding: 16px 8px 0;
-  margin: 0;
+  color: #E2E8F0;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 14px 0 0;
+  padding: 0 4px;
   line-height: 1.45;
+  max-width: 260px;
 }
 
 /* =========================================================

@@ -111,58 +111,54 @@
     <!-- ── ABA KHQR Modal Popup (Official ABA PayWay template3_color) ── -->
     <div id="khqr-modal-overlay" class="khqr-modal-overlay hidden-modal" role="dialog" aria-modal="true" aria-labelledby="khqr_merchant_name">
       
-      <!-- Official template3_color Container -->
-      <div class="pw-card">
+      <!-- Official template3_color Wrapper -->
+      <div class="t3-modal-wrapper">
         
         <!-- Dismiss Button -->
-        <button type="button" class="khqr-modal-close" id="khqr-modal-close" aria-label="Close KHQR Popup">&times;</button>
+        <button type="button" class="t3-close-btn" id="khqr-modal-close" aria-label="Close KHQR Popup">&times;</button>
 
-        <div class="pw-khqr">
+        <!-- Official ABA' PAY Wordmarks Centered Above Ticket -->
+        <div class="t3-brand-header">
+          <img src="/images/wordmark-1.svg" alt="ABA'" class="t3-wm1" />
+          <img src="/images/wordmark-2.svg" alt="PAY" class="t3-wm2" />
+        </div>
+
+        <!-- Official template3_color Single Ticket Card -->
+        <div class="t3-card">
           
-          <!-- Official ABA' PAY Wordmarks Centered Above Ticket -->
-          <div class="pw-khqr-wordmarks">
-            <img src="/images/wordmark-1.svg" alt="ABA'" class="wm1" />
-            <img src="/images/wordmark-2.svg" alt="PAY" class="wm2" />
+          <!-- Official Red Ribbon Banner with Chamfer Cut & Centered White KHQR Logo -->
+          <div class="t3-banner">
+            <img src="/images/khqr-logo-in-ribbon.svg" alt="KHQR" class="t3-khqr-logo" />
           </div>
 
-          <!-- Official Red & White KHQR Ticket Card -->
-          <div class="pw-khqr-inner">
-            
-            <!-- Official Red Ribbon Banner with Signature Chamfer Cut & KHQR Logo -->
-            <div class="pw-khqr-ribbon">
-              <img src="/images/ribbon-banner.svg" alt="KHQR" />
-            </div>
+          <!-- Merchant Name & Amount -->
+          <div class="t3-merchant-box">
+            <p class="t3-merchant-name" id="khqr_merchant_name">SK STORE</p>
+            <p class="t3-amount" id="khqr_amount">$ 0.00</p>
+          </div>
 
-            <!-- Merchant Name & Amount -->
-            <div class="pw-khqr-merchant">
-              <p class="pw-khqr-merchant-name" id="khqr_merchant_name">SK STORE</p>
-              <p class="pw-khqr-amount" id="khqr_amount">$ 0.00</p>
-            </div>
+          <!-- Dashed dividing line -->
+          <div class="t3-dashed-divider"></div>
 
-            <!-- Dashed dividing line -->
-            <div class="pw-khqr-divider"></div>
-
-            <!-- QR Code Box with Official Red Bakong Emblem Badge -->
-            <div class="pw-khqr-qr-wrap">
-              <div id="qr-container" class="qr-container" role="img" aria-label="ABA KHQR payment QR code">
-                <div class="qr-placeholder">
-                  <p>Loading QR…</p>
-                </div>
+          <!-- QR Code Box with Official Red Bakong Emblem Badge -->
+          <div class="t3-qr-wrap">
+            <div id="qr-container" class="t3-qr-container" role="img" aria-label="ABA KHQR payment QR code">
+              <div class="qr-placeholder">
+                <p>Loading QR…</p>
               </div>
-              <!-- Official Center Bakong Badge inside QR -->
-              <img src="/images/bakong-logo-qrcode.svg" alt="Bakong KHQR" class="pw-khqr-corner-mark" id="qr-center-badge" />
             </div>
+            <!-- Official Center Bakong Badge inside QR -->
+            <img src="/images/bakong-logo-qrcode.svg" alt="Bakong KHQR" class="t3-bakong-badge" id="qr-center-badge" />
+          </div>
 
-          </div><!-- /pw-khqr-inner -->
+        </div><!-- /t3-card -->
 
-          <!-- Official footer caption per template3 specification -->
-          <p class="pw-khqr-caption">
-            Scan with ABA Mobile or any KHQR supported banking app
-          </p>
+        <!-- Official footer caption per template3 specification -->
+        <p class="t3-caption">
+          Scan with ABA Mobile or any KHQR supported banking app
+        </p>
 
-        </div><!-- /pw-khqr -->
-
-      </div><!-- /pw-card -->
+      </div><!-- /t3-modal-wrapper -->
 
     </div><!-- /khqr-modal-overlay -->
 
