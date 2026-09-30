@@ -65,7 +65,11 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
   // UTC req_time matching Postman Pre-request script
   const req_time = `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}` +
                    `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
-  const tran_id = String(reference || `T${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 20);
+  const tran_id = String(reference || `T${Date.now()}`)
+    .replace(/[^a-zA-Z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 20);
 
   // Format items array for ABA PayWay spec ({name, quantity, price})
   const paywayItems = (items || []).map(i => ({
