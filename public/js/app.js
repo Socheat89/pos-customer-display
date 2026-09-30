@@ -312,7 +312,7 @@
     }
     const merchantEl = document.getElementById("khqr_merchant_name") || document.getElementById("khqr-ticket-merchant");
     if (merchantEl) {
-      merchantEl.textContent = "SK STORE";
+      merchantEl.textContent = data.merchant_name || "SK STORE";
     }
 
     // Toggle ABA KHQR Modal Overlay visibility based on show_qr flag
@@ -326,17 +326,27 @@
 
     if (khqrModal) {
       if (showQR) {
-        // Always render using our custom CSS template3_color card (shows "SK STORE")
-        // Use qr_string from ABA PayWay API (valid scannable KHQR) rendered by qrcode.js
-        if (officialImg) officialImg.classList.add("hidden");
-        if (brandHeader) brandHeader.style.display = "flex";
-        if (t3Card)      t3Card.style.display      = "flex";
-        if (t3Caption)   t3Caption.style.display   = "block";
+        // If ABA PayWay API returned official pre-rendered Base64 PNG image (template3_color)
+        if (data.qr_image) {
+          if (officialImg) {
+            officialImg.src = data.qr_image;
+            officialImg.classList.remove("hidden");
+          }
+          if (brandHeader) brandHeader.style.display = "none";
+          if (t3Card)      t3Card.style.display = "none";
+          if (t3Caption)   t3Caption.style.display = "none";
+        } else {
+          // Fallback: Render dynamic QR into CSS template3 card
+          if (officialImg) officialImg.classList.add("hidden");
+          if (brandHeader) brandHeader.style.display = "flex";
+          if (t3Card)      t3Card.style.display = "flex";
+          if (t3Caption)   t3Caption.style.display = "block";
 
-        const qrPayload = data.qr_string;
-        if (qrPayload && qrPayload !== lastRenderedQr) {
-          lastRenderedQr = qrPayload;
-          renderQRCode(qrPayload);
+          const qrPayload = data.qr_string;
+          if (qrPayload && qrPayload !== lastRenderedQr) {
+            lastRenderedQr = qrPayload;
+            renderQRCode(qrPayload);
+          }
         }
         khqrModal.classList.remove("hidden-modal");
       } else {
