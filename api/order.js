@@ -258,13 +258,15 @@ export default async function handler(req, res) {
     const currency = payload.currency || (payload.currency_id === 1 ? 'USD' : (payload.currency_id === 143 ? 'KHR' : 'USD'));
     const items = Array.isArray(payload.items) ? payload.items : (Array.isArray(payload.order_lines) ? payload.order_lines : []);
 
+    const reqStatus = (payload.status || 'ACTIVE').toUpperCase();
+
     // 1. Direct qrString / qrImage from payload
     let qrString = payload.qrString || payload.qr_string || payload.qr_code || payload.qr || null;
     let qrImage  = payload.qrImage || payload.qr_image || null;
     let deeplink = payload.abapay_deeplink || null;
 
     // Fast cache check: if this order already has a generated qr_string with same amount, reuse it instantly!
-    if (!qrString && !qrImage && amountTotal > 0) {
+    if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0) {
       try {
         const prevRaw = await redis.get(`pos_session_${storeId}`);
         if (prevRaw) {
@@ -279,7 +281,7 @@ export default async function handler(req, res) {
     }
 
     // 2. Otherwise generate dynamic KHQR via ABA PayWay Sandbox / Production API (2s max timeout)
-    if (!qrString && !qrImage && amountTotal > 0) {
+    if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0) {
       const paywayRes = await fetchABAPaywayQR({
         storeId,
         reference,
@@ -295,7 +297,7 @@ export default async function handler(req, res) {
     }
 
     // 3. Dynamic EMVCo KHQR string with valid CRC16 Checksum for the exact amount
-    if (!qrString && !qrImage && amountTotal > 0) {
+    if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0) {
       qrString = generateEMVCoKHQR({
         merchantName: 'SK STORE',
         city: 'Phnom Penh',
@@ -305,13 +307,13 @@ export default async function handler(req, res) {
     }
 
     // 4. Fallback only if amount is 0 and default string is provided
-    if (!qrString && !qrImage && process.env.DEFAULT_KHQR_STRING) {
+    if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && process.env.DEFAULT_KHQR_STRING) {
       qrString = process.env.DEFAULT_KHQR_STRING;
     }
 
     // Standardize session data for Upstash Redis
     const sessionData = {
-      status: 'ACTIVE',
+      status: reqStatus,
       store_id: storeId,
       name: reference,
       reference: reference,
@@ -321,19 +323,19 @@ export default async function handler(req, res) {
       qr_string: qrString,
       qr_image: qrImage,
       abapay_deeplink: deeplink,
-      show_qr: payload.show_qr !== undefined ? Boolean(payload.show_qr) : Boolean(payload.is_payment || payload.payment),
+      show_qr: reqStatus === 'SUCCESS' ? false : (payload.show_qr !== undefined ? Boolean(payload.show_qr) : Boolean(payload.is_payment || payload.payment)),
       updated_at: Date.now(),
     };
 
     // Save to Redis key per store
     await redis.set(`pos_session_${storeId}`, JSON.stringify(sessionData));
 
-    console.log(`[order] Saved session for store: ${storeId}, total=${amountTotal}, ref=${reference}`);
+    console.log(`[order] Saved session for store: ${storeId}, status=${reqStatus}, total=${amountTotal}, ref=${reference}`);
 
     return res.status(200).json({
       success: true,
       store_id: storeId,
-      status: 'ACTIVE',
+      status: reqStatus,
     });
   } catch (err) {
     console.error('[order] Error:', err);
