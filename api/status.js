@@ -21,11 +21,19 @@ export default async function handler(req, res) {
 
     const rawData = await redis.get(`pos_session_${storeId}`);
 
+    const hasPaywayKeys = Boolean(process.env.ABA_PAYWAY_MERCHANT_ID && (process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY));
+    const paywayApiUrl = process.env.ABA_PAYWAY_API_URL || 'default_generate_qr';
+
     if (!rawData) {
-      return res.status(200).json({ status: 'IDLE', store_id: storeId });
+      return res.status(200).json({
+        status: 'IDLE',
+        store_id: storeId,
+        _diagnostic: { hasPaywayKeys, paywayApiUrl }
+      });
     }
 
     const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+    data._diagnostic = { hasPaywayKeys, paywayApiUrl };
     return res.status(200).json(data);
   } catch (err) {
     return res.status(500).json({ error: err.message });

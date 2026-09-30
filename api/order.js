@@ -47,8 +47,8 @@ const GENERATE_QR_HASH_ORDER = [
 async function fetchABAPaywayQR({ storeId, reference, amount, currency, items }) {
   const merchantId = process.env.ABA_PAYWAY_MERCHANT_ID;
   const apiKey     = process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY;
-  // Default to the exact Purchase API endpoint shown in Postman
-  const apiUrl     = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
+  // Default to the official generate-qr endpoint which returns qrImage (template3_color)
+  const apiUrl     = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/generate-qr';
 
   if (!merchantId || !apiKey) {
     console.warn('[payway] Missing ABA_PAYWAY_MERCHANT_ID or ABA_PAYWAY_PUBLIC_KEY in Environment Variables');
@@ -79,36 +79,35 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     let response;
 
-    // ── Branch A: /payments/generate-qr (JSON Payload) ──────────────
+    // ── Branch A: /payments/generate-qr (JSON Payload — returns qrImage template3_color) ──────────────
     if (apiUrl.includes('generate-qr')) {
       const qrf = {
         req_time,
         merchant_id: merchantId,
         tran_id,
-        first_name: 'SK',
-        last_name: 'Store',
+        first_name: 'ABA',
+        last_name: 'Bank',
         email: 'cheatgaming1111@gmail.com',
         phone: '012345678',
-        amount: formattedAmount,
+        amount: Number(formattedAmount),
         purchase_type: 'purchase',
         payment_option: 'abapay_khqr',
         items: items_base64,
         currency: currency || 'USD',
         callback_url: callbackUrl,
-        return_deeplink: '',
-        custom_fields: '',
-        return_params: storeId,
-        payout: '',
-        lifetime: '10',
+        return_deeplink: null,
+        custom_fields: null,
+        return_params: null,
+        payout: null,
+        lifetime: 6,
         qr_image_template: 'template3_color',
       };
       const b4hash = GENERATE_QR_HASH_ORDER.map(k => (qrf[k] !== undefined && qrf[k] !== null ? String(qrf[k]) : '')).join('');
       qrf.hash = crypto.createHmac('sha512', apiKey).update(b4hash).digest('base64');
-      qrf.amount = Number(formattedAmount);
 
       response = await fetch(apiUrl, {
         method: 'POST',
@@ -168,13 +167,16 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
     if (response.ok) {
       const data = await response.json();
       console.log(`[payway] API Response for store=${storeId}:`, data);
-      if (data.status?.code === '0' || data.status === '0' || data.status === 0 || data.status === 'SUCCESS') {
+      if (data.qrImage || data.qrString || data.status?.code === '0' || data.status === '0' || data.status === 0 || data.status === 'SUCCESS') {
         return {
           qrString: data.qrString || data.qr_string || null,
           qrImage: data.qrImage || data.qr_image || null,
           abapay_deeplink: data.abapay_deeplink || null,
         };
       }
+    } else {
+      const errTxt = await response.text();
+      console.warn(`[payway] HTTP ${response.status}:`, errTxt);
     }
   } catch (err) {
     console.warn(`[payway] Failed to fetch ABA PayWay API:`, err.message);
