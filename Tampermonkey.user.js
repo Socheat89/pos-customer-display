@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.0
+// @version      14.1
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -23,6 +23,7 @@
 
     // ── Persistent Cache across screen switches ────────────────
     let lastKey          = '';
+    let lastScreenState  = '';
     let isCurrentlyReset = false;
     let cachedItems      = [];
     let cachedTotal      = 0;
@@ -356,10 +357,12 @@
         // C. ចាត់ប្រភេទ Screen (ផ្សំ JS Model + DOM Selectors)
         // ──────────────────────────────────────────────────────────
         const isPayment = screenName === 'PaymentScreen' || isPaymentScreenActive();
-        const isReceipt = (screenName === 'ReceiptScreen' || (!isPayment && isReceiptScreenActive())) && !isPayment;
-        const isProduct = !isReceipt && !isPayment;
-
-        console.log(`[POS Sync] store=${STORE_ID} screen="${screenName||'?'}" isPayment=${isPayment} isReceipt=${isReceipt}`);
+        const effectiveScreen = screenName || (isPayment ? 'PaymentScreen' : (isReceipt ? 'ReceiptScreen' : 'ProductScreen'));
+        const stateKey = `${effectiveScreen}|${isPayment}|${isReceipt}`;
+        if (stateKey !== lastScreenState) {
+            lastScreenState = stateKey;
+            console.log(`[POS Sync] store=${STORE_ID} screen="${effectiveScreen}" isPayment=${isPayment} isReceipt=${isReceipt}`);
+        }
 
         // ──────────────────────────────────────────────────────────
         // D. ស្រង់ Currency ពី Odoo POS
@@ -450,7 +453,7 @@
             // លើ Payment Screen, Odoo លាក់ DOM items -> យកពី Cache
             items = cachedItems;
             if (total === 0) total = cachedTotal;
-            console.log(`[POS Sync] PaymentScreen: using cached items(${items.length}) total=$${total}`);
+            console.debug(`[POS Sync] PaymentScreen: using cached items(${items.length}) total=$${total}`);
         }
 
         // បើគ្មានទំនិញទាំងស្រុង ត្រូវ Reset ត្រឡប់ទៅ IDLE ភ្លាម
