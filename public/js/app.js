@@ -320,6 +320,7 @@
     const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true;
 
     if (khqrModal) {
+      if (showQR) {
         // Render QR code from qr_image (Base64) or qr_string
         const qrPayload = data.qr_image || data.qr_string;
         if (qrPayload && qrPayload !== lastRenderedQr) {
