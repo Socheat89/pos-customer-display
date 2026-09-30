@@ -316,16 +316,37 @@
     }
 
     // Toggle ABA KHQR Modal Overlay visibility based on show_qr flag
-    const khqrModal = document.getElementById("khqr-modal-overlay");
+    const khqrModal   = document.getElementById("khqr-modal-overlay");
+    const officialImg = document.getElementById("t3-official-image");
+    const brandHeader = document.querySelector(".t3-brand-header");
+    const t3Card      = document.querySelector(".t3-card");
+    const t3Caption   = document.querySelector(".t3-caption");
+
     const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true;
 
     if (khqrModal) {
       if (showQR) {
-        // Render QR code from qr_image (Base64) or qr_string
-        const qrPayload = data.qr_image || data.qr_string;
-        if (qrPayload && qrPayload !== lastRenderedQr) {
-          lastRenderedQr = qrPayload;
-          renderQRCode(qrPayload);
+        // If ABA PayWay API returned official pre-rendered Base64 PNG image (template3_color)
+        if (data.qr_image) {
+          if (officialImg) {
+            officialImg.src = data.qr_image;
+            officialImg.classList.remove("hidden");
+          }
+          if (brandHeader) brandHeader.style.display = "none";
+          if (t3Card)      t3Card.style.display = "none";
+          if (t3Caption)   t3Caption.style.display = "none";
+        } else {
+          // Fallback: Render dynamic QR into CSS template3 card
+          if (officialImg) officialImg.classList.add("hidden");
+          if (brandHeader) brandHeader.style.display = "flex";
+          if (t3Card)      t3Card.style.display = "flex";
+          if (t3Caption)   t3Caption.style.display = "block";
+
+          const qrPayload = data.qr_string;
+          if (qrPayload && qrPayload !== lastRenderedQr) {
+            lastRenderedQr = qrPayload;
+            renderQRCode(qrPayload);
+          }
         }
         khqrModal.classList.remove("hidden-modal");
       } else {
