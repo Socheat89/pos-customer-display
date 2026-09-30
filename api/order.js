@@ -20,43 +20,35 @@ function getFormattedReqTime() {
 }
 
 /**
- * Generate HMAC-SHA512 signature hash for ABA PayWay QR API (generate-qr endpoint)
- * Official hash string order:
- * req_time + merchant_id + tran_id + amount + items + first_name + last_name + email + phone + purchase_type + payment_option + callback_url + return_deeplink + currency + custom_fields + return_params + payout + lifetime + qr_image_template
+ * 24-Slot Fixed Order Hash Specification for ABA PayWay Purchase API
  */
-function generatePaywayQRHash(params, apiKey) {
-  const parts = [
-    params.req_time || '',
-    params.merchant_id || '',
-    params.tran_id || '',
-    params.amount !== undefined && params.amount !== null ? String(params.amount) : '',
-    params.items || '',
-    params.first_name || '',
-    params.last_name || '',
-    params.email || '',
-    params.phone || '',
-    params.purchase_type || '',
-    params.payment_option || '',
-    params.callback_url || '',
-    params.return_deeplink || '',
-    params.currency || '',
-    params.custom_fields || '',
-    params.return_params || '',
-    params.payout || '',
-    params.lifetime !== undefined && params.lifetime !== null ? String(params.lifetime) : '',
-    params.qr_image_template || '',
-  ];
-  const rawStr = parts.join('');
-  return crypto.createHmac('sha512', apiKey).update(rawStr).digest('base64');
-}
+const PURCHASE_HASH_ORDER = [
+  "req_time", "merchant_id", "tran_id", "amount", "items", "shipping",
+  "firstname", "lastname", "email", "phone", "type", "payment_option",
+  "return_url", "cancel_url", "continue_success_url", "return_deeplink",
+  "currency", "custom_fields", "return_params", "payout", "lifetime",
+  "additional_params", "google_pay_token", "skip_success_page"
+];
 
 /**
- * Call ABA PayWay Sandbox / Production QR API to create transaction and fetch template3_color QR
+ * 19-Field Order Hash Specification for ABA PayWay Generate-QR API
+ */
+const GENERATE_QR_HASH_ORDER = [
+  "req_time", "merchant_id", "tran_id", "amount", "items",
+  "first_name", "last_name", "email", "phone", "purchase_type",
+  "payment_option", "callback_url", "return_deeplink", "currency",
+  "custom_fields", "return_params", "payout", "lifetime", "qr_image_template"
+];
+
+/**
+ * Call ABA PayWay Sandbox / Production API to create transaction and fetch KHQR string / image
+ * Supports both /payments/purchase (Postman 24-slot Form-Data) and /payments/generate-qr (JSON)
  */
 async function fetchABAPaywayQR({ storeId, reference, amount, currency, items }) {
   const merchantId = process.env.ABA_PAYWAY_MERCHANT_ID;
   const apiKey     = process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY;
-  const apiUrl     = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/generate-qr';
+  // Default to the exact Purchase API endpoint shown in Postman
+  const apiUrl     = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
 
   if (!merchantId || !apiKey) {
     console.warn('[payway] Missing ABA_PAYWAY_MERCHANT_ID or ABA_PAYWAY_PUBLIC_KEY in Environment Variables');
@@ -65,8 +57,12 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
 
   // Format amount to 2 decimal places
   const formattedAmount = Number(amount || 0).toFixed(2);
-  const req_time = getFormattedReqTime();
-  const tran_id = String(reference || `POS_${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 20);
+  const pad = n => String(n).padStart(2, "0");
+  const d = new Date();
+  // UTC req_time matching Postman Pre-request script
+  const req_time = `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}` +
+                   `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
+  const tran_id = String(reference || `T${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 20);
 
   // Format items array for ABA PayWay spec ({name, quantity, price})
   const paywayItems = (items || []).map(i => ({
@@ -74,62 +70,105 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
     quantity: Number(i.qty || i.quantity || 1),
     price: Number(i.price || 0)
   }));
+  const items_base64 = Buffer.from(JSON.stringify(paywayItems.length ? paywayItems : [{ name: "Order", quantity: 1, price: Number(formattedAmount) }])).toString('base64');
 
-  // Encode items to Base64 JSON
-  const items_base64 = Buffer.from(JSON.stringify(paywayItems)).toString('base64');
-  const payment_option = 'abapay_khqr';
-
-  // Host callback URL
+  // Callback / Return URL
   const callbackUrl = process.env.VERCEL_URL
     ? Buffer.from(`https://${process.env.VERCEL_URL}/api/callback?store=${storeId}`).toString('base64')
     : Buffer.from(`https://pos-customer-display.vercel.app/api/callback?store=${storeId}`).toString('base64');
 
-  const reqPayload = {
-    req_time,
-    merchant_id: merchantId,
-    tran_id,
-    first_name: 'SK',
-    last_name: 'Store',
-    email: 'cheatgaming1111@gmail.com',
-    phone: '012345678',
-    amount: formattedAmount,
-    purchase_type: 'purchase',
-    payment_option,
-    items: items_base64,
-    currency: currency || 'USD',
-    callback_url: callbackUrl,
-    return_deeplink: null,
-    custom_fields: null,
-    return_params: storeId,
-    payout: null,
-    lifetime: 10,
-    qr_image_template: 'template3_color',
-  };
-
-  // Calculate HMAC-SHA512 hash using official concatenation formula
-  const hash = generatePaywayQRHash(reqPayload, apiKey);
-  reqPayload.hash = hash;
-  reqPayload.amount = Number(formattedAmount); // send numeric in JSON payload
-
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(reqPayload),
-      signal: controller.signal,
-    });
+    let response;
+
+    // ── Branch A: /payments/generate-qr (JSON Payload) ──────────────
+    if (apiUrl.includes('generate-qr')) {
+      const qrf = {
+        req_time,
+        merchant_id: merchantId,
+        tran_id,
+        first_name: 'SK',
+        last_name: 'Store',
+        email: 'cheatgaming1111@gmail.com',
+        phone: '012345678',
+        amount: formattedAmount,
+        purchase_type: 'purchase',
+        payment_option: 'abapay_khqr',
+        items: items_base64,
+        currency: currency || 'USD',
+        callback_url: callbackUrl,
+        return_deeplink: '',
+        custom_fields: '',
+        return_params: storeId,
+        payout: '',
+        lifetime: '10',
+        qr_image_template: 'template3_color',
+      };
+      const b4hash = GENERATE_QR_HASH_ORDER.map(k => (qrf[k] !== undefined && qrf[k] !== null ? String(qrf[k]) : '')).join('');
+      qrf.hash = crypto.createHmac('sha512', apiKey).update(b4hash).digest('base64');
+      qrf.amount = Number(formattedAmount);
+
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(qrf),
+        signal: controller.signal,
+      });
+    } else {
+      // ── Branch B: /payments/purchase (Postman 24-slot Form-Data) ───
+      const f = {
+        req_time,
+        merchant_id:          merchantId,
+        tran_id,
+        amount:               formattedAmount,
+        items:                items_base64,
+        shipping:             '',
+        firstname:            'SK',
+        lastname:             'Store',
+        email:                'cheatgaming1111@gmail.com',
+        phone:                '012345678',
+        type:                 'purchase',
+        payment_option:       'abapay_khqr_deeplink',
+        return_url:           callbackUrl,
+        cancel_url:           '',
+        continue_success_url: '',
+        return_deeplink:      '',
+        currency:             currency || 'USD',
+        custom_fields:        '',
+        return_params:        storeId,
+        payout:               '',
+        lifetime:             '10',
+        additional_params:    '',
+        google_pay_token:     '',
+        skip_success_page:    '',
+      };
+
+      const b4hash = PURCHASE_HASH_ORDER.map(k => (f[k] !== undefined && f[k] !== null ? String(f[k]) : '')).join('');
+      f.hash = crypto.createHmac('sha512', apiKey).update(b4hash).digest('base64');
+
+      // Send form-data with only non-empty fields (per Postman script sent = Object.keys(f).filter(k => f[k] !== ""))
+      const formData = new FormData();
+      Object.keys(f).forEach(k => {
+        if (f[k] !== '') {
+          formData.append(k, String(f[k]));
+        }
+      });
+
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+    }
+
     clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
       console.log(`[payway] API Response for store=${storeId}:`, data);
-      if (data.status?.code === '0' || data.status === '0' || data.status === 'SUCCESS' || data.status?.code === 0) {
+      if (data.status?.code === '0' || data.status === '0' || data.status === 0 || data.status === 'SUCCESS') {
         return {
           qrString: data.qrString || data.qr_string || null,
           qrImage: data.qrImage || data.qr_image || null,
