@@ -47,12 +47,15 @@ const GENERATE_QR_HASH_ORDER = [
 async function fetchABAPaywayQR({ storeId, reference, amount, currency, items }) {
   const merchantId = process.env.ABA_PAYWAY_MERCHANT_ID;
   const apiKey     = process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY;
-  // Default to the official generate-qr endpoint which returns qrImage (template3_color)
-  const apiUrl     = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/generate-qr';
+  // Always use the official generate-qr endpoint to get the pre-rendered template3_color qrImage
+  let apiUrl       = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/generate-qr';
+  if (apiUrl.includes('/payments/purchase')) {
+    apiUrl = apiUrl.replace('/payments/purchase', '/payments/generate-qr');
+  }
 
   if (!merchantId || !apiKey) {
     console.warn('[payway] Missing ABA_PAYWAY_MERCHANT_ID or ABA_PAYWAY_PUBLIC_KEY in Environment Variables');
-    return null;
+    return { error: 'Missing ABA PayWay Credentials in Environment' };
   }
 
   // Format amount to 2 decimal places
@@ -174,14 +177,16 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
           abapay_deeplink: data.abapay_deeplink || null,
         };
       }
+      return { error: 'PayWay returned non-zero status', raw: data };
     } else {
       const errTxt = await response.text();
       console.warn(`[payway] HTTP ${response.status}:`, errTxt);
+      return { error: `HTTP ${response.status}`, details: errTxt };
     }
   } catch (err) {
     console.warn(`[payway] Failed to fetch ABA PayWay API:`, err.message);
+    return { error: err.message };
   }
-  return null;
 }
 
 /**
@@ -282,7 +287,8 @@ export default async function handler(req, res) {
       } catch (_) {}
     }
 
-    // 2. Otherwise generate dynamic KHQR via ABA PayWay Sandbox / Production API (2s max timeout)
+    let paywayDebug = null;
+    // 2. Otherwise generate dynamic KHQR via ABA PayWay Sandbox / Production API
     if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0) {
       const paywayRes = await fetchABAPaywayQR({
         storeId,
@@ -292,9 +298,12 @@ export default async function handler(req, res) {
         items,
       });
       if (paywayRes) {
-        qrString = paywayRes.qrString;
-        qrImage  = paywayRes.qrImage;
-        deeplink = paywayRes.abapay_deeplink;
+        paywayDebug = paywayRes;
+        if (paywayRes.qrString || paywayRes.qrImage) {
+          qrString = paywayRes.qrString;
+          qrImage  = paywayRes.qrImage;
+          deeplink = paywayRes.abapay_deeplink;
+        }
       }
     }
 
@@ -327,6 +336,7 @@ export default async function handler(req, res) {
       abapay_deeplink: deeplink,
       show_qr: reqStatus === 'SUCCESS' ? false : (payload.show_qr !== undefined ? Boolean(payload.show_qr) : Boolean(payload.is_payment || payload.payment)),
       updated_at: Date.now(),
+      _payway_debug: paywayDebug,
     };
 
     // Save to Redis key per store
@@ -338,6 +348,7 @@ export default async function handler(req, res) {
       success: true,
       store_id: storeId,
       status: reqStatus,
+      _payway_debug: paywayDebug,
     });
   } catch (err) {
     console.error('[order] Error:', err);
