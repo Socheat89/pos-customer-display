@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.1
+// @version      14.2
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -311,58 +311,60 @@
      * ត្រួតពិនិត្យ និង Sync ទិន្នន័យពី Odoo POS ទៅ Vercel
      */
     function checkPOS() {
-        const STORE_ID  = getStoreId();
-        const RESET_API = `${VERCEL_BASE}/api/reset?store=${STORE_ID}`;
-
-        const pos = getOdooPos();
-
-        // ──────────────────────────────────────────────────────────
-        // A. ស្រង់ Screen Name ពី Odoo JS model (ត្រឹមត្រូវបំផុត)
-        // ──────────────────────────────────────────────────────────
-        let screenName = '';
         try {
-            if (pos) {
-                // Odoo 17/18 OWL: mainScreen is a reactive object
-                if (pos.mainScreen?.component?.name) {
-                    screenName = pos.mainScreen.component.name;
-                } else if (typeof pos.mainScreen?.name === 'string') {
-                    screenName = pos.mainScreen.name;
+            const STORE_ID  = getStoreId();
+            const RESET_API = `${VERCEL_BASE}/api/reset?store=${STORE_ID}`;
+
+            const pos = getOdooPos();
+
+            // ──────────────────────────────────────────────────────────
+            // A. ស្រង់ Screen Name ពី Odoo JS model (ត្រឹមត្រូវបំផុត)
+            // ──────────────────────────────────────────────────────────
+            let screenName = '';
+            try {
+                if (pos) {
+                    // Odoo 17/18 OWL: mainScreen is a reactive object
+                    if (pos.mainScreen?.component?.name) {
+                        screenName = pos.mainScreen.component.name;
+                    } else if (typeof pos.mainScreen?.name === 'string') {
+                        screenName = pos.mainScreen.name;
+                    }
+                    // Fallback: screen_data on current order
+                    if (!screenName) {
+                        const ord = pos.get_order?.();
+                        const sd  = ord?.get_screen_data?.() ?? ord?.screen_data;
+                        if (sd?.name) screenName = sd.name;
+                    }
                 }
-                // Fallback: screen_data on current order
-                if (!screenName) {
-                    const ord = pos.get_order?.();
-                    const sd  = ord?.get_screen_data?.() ?? ord?.screen_data;
-                    if (sd?.name) screenName = sd.name;
-                }
+            } catch (_) {}
+
+            // ──────────────────────────────────────────────────────────
+            // B. DOM fallback flags (ប្រើបន្ថែម មិនលើកឡើង)
+            // ──────────────────────────────────────────────────────────
+            const domHasReceipt  = Boolean(document.querySelector('.receipt-screen, .pos-receipt-container'));
+            const domHasPayment  = Boolean(document.querySelector(
+                '.payment-screen, .paymentlines, .paymentmethods, .payment-methods'
+            ));
+            // Validate button exists AND a payment method button exists (narrow check)
+            const hasValidateBtn = Boolean(document.querySelector(
+                'button.validate, .button.validate, button.validation'
+            ));
+            const hasPaymentMethodBtn = Boolean(document.querySelector(
+                '.paymentmethod, .payment-method, [data-method], .paymentmethods .button'
+            ));
+            const domPaymentStrict = domHasPayment || (hasValidateBtn && hasPaymentMethodBtn);
+
+            // ──────────────────────────────────────────────────────────
+            // C. ចាត់ប្រភេទ Screen (ផ្សំ JS Model + DOM Selectors)
+            // ──────────────────────────────────────────────────────────
+            const isPayment = screenName === 'PaymentScreen' || isPaymentScreenActive();
+            const isReceipt = (screenName === 'ReceiptScreen' || (!isPayment && isReceiptScreenActive())) && !isPayment;
+            const effectiveScreen = screenName || (isPayment ? 'PaymentScreen' : (isReceipt ? 'ReceiptScreen' : 'ProductScreen'));
+            const stateKey = `${effectiveScreen}|${isPayment}|${isReceipt}`;
+            if (stateKey !== lastScreenState) {
+                lastScreenState = stateKey;
+                console.log(`[POS Sync] store=${STORE_ID} screen="${effectiveScreen}" isPayment=${isPayment} isReceipt=${isReceipt}`);
             }
-        } catch (_) {}
-
-        // ──────────────────────────────────────────────────────────
-        // B. DOM fallback flags (ប្រើបន្ថែម មិនលើកឡើង)
-        // ──────────────────────────────────────────────────────────
-        const domHasReceipt  = Boolean(document.querySelector('.receipt-screen, .pos-receipt-container'));
-        const domHasPayment  = Boolean(document.querySelector(
-            '.payment-screen, .paymentlines, .paymentmethods, .payment-methods'
-        ));
-        // Validate button exists AND a payment method button exists (narrow check)
-        const hasValidateBtn = Boolean(document.querySelector(
-            'button.validate, .button.validate, button.validation'
-        ));
-        const hasPaymentMethodBtn = Boolean(document.querySelector(
-            '.paymentmethod, .payment-method, [data-method], .paymentmethods .button'
-        ));
-        const domPaymentStrict = domHasPayment || (hasValidateBtn && hasPaymentMethodBtn);
-
-        // ──────────────────────────────────────────────────────────
-        // C. ចាត់ប្រភេទ Screen (ផ្សំ JS Model + DOM Selectors)
-        // ──────────────────────────────────────────────────────────
-        const isPayment = screenName === 'PaymentScreen' || isPaymentScreenActive();
-        const effectiveScreen = screenName || (isPayment ? 'PaymentScreen' : (isReceipt ? 'ReceiptScreen' : 'ProductScreen'));
-        const stateKey = `${effectiveScreen}|${isPayment}|${isReceipt}`;
-        if (stateKey !== lastScreenState) {
-            lastScreenState = stateKey;
-            console.log(`[POS Sync] store=${STORE_ID} screen="${effectiveScreen}" isPayment=${isPayment} isReceipt=${isReceipt}`);
-        }
 
         // ──────────────────────────────────────────────────────────
         // D. ស្រង់ Currency ពី Odoo POS
@@ -521,7 +523,10 @@
                 }
             });
         }
+    } catch (err) {
+        console.error('[POS Sync Error]', err);
     }
+}
 
     // ពិនិត្យរៀងរាល់ 250ms
     setInterval(checkPOS, 250);
