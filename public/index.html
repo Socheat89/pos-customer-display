@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/style.css?v=20260930_1" />
 
   <!-- qrcode.js — lightweight QR renderer (no build step required) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
@@ -108,70 +108,61 @@
 
     </div><!-- /panel-right -->
 
-    <!-- ── ABA KHQR Modal Popup (Matches Official ABA PayWay UI) ── -->
-    <div id="khqr-modal-overlay" class="khqr-modal-overlay hidden-modal" role="dialog" aria-modal="true" aria-labelledby="khqr-modal-title">
+    <!-- ── ABA KHQR Modal Popup (Official ABA PayWay template3_color) ── -->
+    <div id="khqr-modal-overlay" class="khqr-modal-overlay hidden-modal" role="dialog" aria-modal="true" aria-labelledby="khqr_merchant_name">
       
-      <!-- Top Right ABA PayWay Logo watermark/header -->
-      <div class="khqr-modal-top-bar">
-        <div class="payway-top-brand">
-          <span class="payway-aba">ABA'</span>
-          <span class="payway-text">PAYWAY</span>
-        </div>
-      </div>
-
-      <!-- Main White Modal Window -->
-      <div class="khqr-modal-card">
+      <!-- Official template3_color Container -->
+      <div class="pw-card">
         
-        <!-- Modal Top Bar: Title & Close Button -->
-        <div class="khqr-modal-header">
-          <h3 id="khqr-modal-title" class="khqr-modal-title">ABA KHQR</h3>
-          <button type="button" class="khqr-modal-close" id="khqr-modal-close" aria-label="Close KHQR Popup">&times;</button>
-        </div>
+        <!-- Dismiss Button -->
+        <button type="button" class="khqr-modal-close" id="khqr-modal-close" aria-label="Close KHQR Popup">&times;</button>
 
-        <!-- Official Red & White KHQR Ticket Card -->
-        <div class="khqr-ticket">
+        <div class="pw-khqr">
           
-          <!-- KHQR Red Banner with signature slanted bottom-right cut corner -->
-          <div class="khqr-ticket-banner">
-            <span class="khqr-ticket-logo">KHQR</span>
+          <!-- Official ABA' PAY Wordmarks Centered Above Ticket -->
+          <div class="pw-khqr-wordmarks">
+            <img src="/images/wordmark-1.svg" alt="ABA'" class="wm1" />
+            <img src="/images/wordmark-2.svg" alt="PAY" class="wm2" />
           </div>
 
-          <!-- White Body of Ticket -->
-          <div class="khqr-ticket-body">
+          <!-- Official Red & White KHQR Ticket Card -->
+          <div class="pw-khqr-inner">
             
-            <!-- Merchant Name -->
-            <div class="khqr-ticket-merchant" id="khqr-ticket-merchant">SK STORE</div>
+            <!-- Official Red Ribbon Banner with Signature Chamfer Cut & KHQR Logo -->
+            <div class="pw-khqr-ribbon">
+              <img src="/images/ribbon-banner.svg" alt="KHQR" />
+            </div>
 
-            <!-- Price & Currency -->
-            <div class="khqr-ticket-amount-row">
-              <span class="khqr-ticket-amount" id="amount-value">0.00</span>
-              <span class="khqr-ticket-currency" id="amount-currency-tag">USD</span>
+            <!-- Merchant Name & Amount -->
+            <div class="pw-khqr-merchant">
+              <p class="pw-khqr-merchant-name" id="khqr_merchant_name">SK STORE</p>
+              <p class="pw-khqr-amount" id="khqr_amount">$ 0.00</p>
             </div>
 
             <!-- Dashed dividing line -->
-            <div class="khqr-ticket-divider"></div>
+            <div class="pw-khqr-divider"></div>
 
-            <!-- Centered QR Code with Currency Symbol Badge -->
-            <div class="khqr-ticket-qr-wrapper">
+            <!-- QR Code Box with Official Red Bakong Emblem Badge -->
+            <div class="pw-khqr-qr-wrap">
               <div id="qr-container" class="qr-container" role="img" aria-label="ABA KHQR payment QR code">
                 <div class="qr-placeholder">
                   <p>Loading QR…</p>
                 </div>
               </div>
-              <!-- Center Badge inside QR ($ / ៛) -->
-              <div class="qr-center-badge" id="qr-center-badge">$</div>
+              <!-- Official Center Bakong Badge inside QR -->
+              <img src="/images/bakong-logo-qrcode.svg" alt="Bakong KHQR" class="pw-khqr-corner-mark" id="qr-center-badge" />
             </div>
 
-          </div><!-- /khqr-ticket-body -->
+          </div><!-- /pw-khqr-inner -->
 
-        </div><!-- /khqr-ticket -->
+          <!-- Official footer caption per template3 specification -->
+          <p class="pw-khqr-caption">
+            Scan with ABA Mobile or any KHQR supported banking app
+          </p>
 
-        <!-- Bottom instruction note -->
-        <p class="khqr-modal-instruction">
-          Scan with ABA Mobile, or other Mobile Banking App supporting KHQR
-        </p>
+        </div><!-- /pw-khqr -->
 
-      </div><!-- /khqr-modal-card -->
+      </div><!-- /pw-card -->
 
     </div><!-- /khqr-modal-overlay -->
 
@@ -226,7 +217,7 @@
 </div><!-- /#app -->
 
 <!-- Client logic — cache-busted on every deploy via ?v= timestamp -->
-<script src="/js/app.js?v=20260925_9"></script>
+<script src="/js/app.js?v=20260930_1"></script>
 
 </body>
 </html>

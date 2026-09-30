@@ -127,8 +127,9 @@
       const img = document.createElement("img");
       img.src = qrString;
       img.alt = "ABA KHQR Payment Code";
-      img.style.width = "340px";
-      img.style.height = "340px";
+      img.className = "pw-khqr-qr-image";
+      img.style.width = "220px";
+      img.style.height = "220px";
       img.onerror = () => {
         container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
       };
@@ -140,8 +141,8 @@
     try {
       new QRCode(container, {
         text:           qrString,
-        width:          340,
-        height:         340,
+        width:          220,
+        height:         220,
         colorDark:      "#000000",
         colorLight:     "#ffffff",
         correctLevel:   QRCode.CorrectLevel.L,
@@ -154,10 +155,11 @@
 
     // 2. Secondary: High-reliability QR Image endpoint fallback
     const img = document.createElement("img");
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=340x340&data=${encodeURIComponent(qrString)}`;
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrString)}`;
     img.alt = "ABA KHQR Payment Code";
-    img.style.width = "340px";
-    img.style.height = "340px";
+    img.className = "pw-khqr-qr-image";
+    img.style.width = "220px";
+    img.style.height = "220px";
     img.onerror = () => {
       container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
     };
@@ -275,23 +277,23 @@
       els.totalCurrency.textContent = '';
     }
 
-    // Update ABA KHQR Modal Card fields
-    if (els.amountValue) {
-      // Just the number as in screenshot: e.g. "600.00"
-      els.amountValue.textContent = formatAmount(data.amount_total || 0);
+    // Update ABA KHQR Modal Card fields (Official template3_color specification)
+    const isKHR = (data.currency || "USD").toUpperCase() === "KHR";
+    const symKhqr = isKHR ? "៛" : "$";
+    const formattedKhqrAmt = isKHR
+      ? Number(data.amount_total || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+      : formatAmount(data.amount_total || 0);
+
+    const khqrAmountEl = document.getElementById("khqr_amount") || els.amountValue;
+    if (khqrAmountEl) {
+      khqrAmountEl.textContent = `${symKhqr} ${formattedKhqrAmt}`;
     }
     if (els.amountCurrency) {
       els.amountCurrency.textContent = (data.currency || "USD").toUpperCase();
     }
-    const merchantEl = document.getElementById("khqr-ticket-merchant");
+    const merchantEl = document.getElementById("khqr_merchant_name") || document.getElementById("khqr-ticket-merchant");
     if (merchantEl) {
       merchantEl.textContent = data.merchant_name || "SK STORE";
-    }
-
-    // Center badge in QR ($ or ៛)
-    const qrBadge = document.getElementById("qr-center-badge");
-    if (qrBadge) {
-      qrBadge.textContent = (data.currency || "USD").toUpperCase() === "KHR" ? "៛" : "$";
     }
 
     // Toggle ABA KHQR Modal Overlay visibility based on show_qr flag

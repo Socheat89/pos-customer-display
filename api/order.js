@@ -222,18 +222,19 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3. Dynamic EMVCo KHQR string with valid CRC16 Checksum
-    if (!qrString) {
-      if (process.env.DEFAULT_KHQR_STRING) {
-        qrString = process.env.DEFAULT_KHQR_STRING;
-      } else {
-        qrString = generateEMVCoKHQR({
-          merchantName: 'SK STORE',
-          city: 'Phnom Penh',
-          amount: amountTotal,
-          currency: currency,
-        });
-      }
+    // 3. Dynamic EMVCo KHQR string with valid CRC16 Checksum for the exact amount
+    if (!qrString && amountTotal > 0) {
+      qrString = generateEMVCoKHQR({
+        merchantName: 'SK STORE',
+        city: 'Phnom Penh',
+        amount: amountTotal,
+        currency: currency,
+      });
+    }
+
+    // 4. Fallback only if amount is 0 and default string is provided
+    if (!qrString && process.env.DEFAULT_KHQR_STRING) {
+      qrString = process.env.DEFAULT_KHQR_STRING;
     }
 
     // Standardize session data for Upstash Redis
