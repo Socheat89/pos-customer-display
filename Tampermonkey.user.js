@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.3
+// @version      14.4
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -102,10 +102,17 @@
 
     /**
      * ត្រួតពិនិត្យថា Cashier ស្ថិតលើផ្ទាំង Payment ឬអត់
-     * Odoo 17/18 OWL — robust multi-strategy detection
+     * Odoo 17/18 OWL — check ProductScreen first, then payment indicators only
      */
     function isPaymentScreenActive() {
-        // 1. ពិនិត្យតាម Odoo POS JS Model (ត្រឹមត្រូវបំផុត)
+        // !! PRIORITY 0: បើក័សែ ProductScreen DOM ស្ក័នវិលត្កែន មានន័យថានៅលើ Payment Screen
+        //    ត្រួតពិនិត្យចុចនេះមុនពេលែរបស់ ប្រាកត្តបញ័ះយរត្នត័សែកៅលើថា២
+        const prodScreen = document.querySelector(
+            '.product-screen, [class*="product-screen"], .products-widget'
+        );
+        if (prodScreen && prodScreen.offsetParent !== null) return false;
+
+        // 1. Odoo POS JS Model (most accurate)
         try {
             const pos = getOdooPos();
             if (pos) {
@@ -122,29 +129,13 @@
             }
         } catch (_) {}
 
-        // 2. URL hash check (Odoo 17 uses #action=payment or similar)
-        if (window.location.hash.toLowerCase().includes('payment')) return true;
-
-        // 3. Check for ABA KHQR / payment method text in visible buttons
-        //    (Most reliable DOM signal for Odoo 17/18 OWL payment screen)
-        const allButtons = document.querySelectorAll('button, .button, [role="button"]');
-        for (const btn of allButtons) {
-            if (btn.offsetParent === null) continue; // skip hidden
-            const txt = (btn.innerText || btn.textContent || '').toLowerCase();
-            if (txt.includes('aba khqr') || txt.includes('khqr') || txt.includes('validate') ||
-                txt.includes('payment') || txt.includes('បង់ប្រាក់') || txt.includes('ទូទាត់')) {
-                return true;
-            }
-        }
-
-        // 4. Odoo 17 OWL — payment screen section/article visible
+        // 2. Odoo 17 OWL — payment screen container selectors
         const owlPaySelectors = [
             '.payment-screen',
             '.screen.payment',
             '[class*="payment-screen"]',
             '[class*="PaymentScreen"]',
             '.pos-payment',
-            'section.payment',
             '.payment-method-list',
             '.payment-methods-list',
         ];
@@ -153,22 +144,30 @@
             if (el && el.offsetParent !== null) return true;
         }
 
-        // 5. Payment lines or validate button visible
+        // 3. Payment lines (paymentlines container visible)
         const payLines = document.querySelector(
             '.paymentlines, .payment-lines, .paymentlines-container, .paymentmethods'
         );
         if (payLines && payLines.offsetParent !== null) return true;
 
+        // 4. Validate button visible (ONLY appears on Payment Screen, not Product Screen)
         const validateBtn = document.querySelector(
-            'button.validate, .button.validate, button.validation, [class*="validate"]'
+            'button.validate, .button.validate, button.validation'
         );
         if (validateBtn && validateBtn.offsetParent !== null) return true;
 
-        // 6. ProductScreen check — if product grid is visible we're NOT on payment
-        const prodWidget = document.querySelector(
-            '.product-screen, .products-widget, .product-list, [class*="product-screen"]'
-        );
-        if (prodWidget && prodWidget.offsetParent !== null) return false;
+        // 5. ABA KHQR or payment method buttons visible
+        //    NOTE: only scan for method names, NOT 'payment' or 'payment' button on product screen
+        const allButtons = document.querySelectorAll('button, .button, [role="button"]');
+        for (const btn of allButtons) {
+            if (btn.offsetParent === null) continue;
+            const txt = (btn.innerText || btn.textContent || '').toLowerCase().trim();
+            // Only match payment METHOD names (unique to payment screen)
+            if (txt === 'aba khqr' || txt.includes('khqr') ||
+                txt === 'cash' || txt === 'bank transfer') {
+                return true;
+            }
+        }
 
         return false;
     }

@@ -423,10 +423,8 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* Lighter, balanced background — improves readability over dark navy */
-  background: rgba(203, 213, 225, 0.72);
-  backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  /* Light, semi-transparent — no blur so background is fully visible */
+  background: rgba(203, 213, 225, 0.45);
   padding: 16px;
   transition: opacity 0.3s ease, visibility 0.3s ease;
   opacity: 1;
@@ -443,7 +441,7 @@ html, body {
    OFFICIAL ABA PAYWAY template3_color SPECIFICATION
    ========================================================= */
 
-/* Template 3 Popup Wrapper — with ABA KHQR protected outline ring */
+/* Template 3 Popup Wrapper — with ABA KHQR protected outline (no red border) */
 .t3-modal-wrapper {
   position: relative;
   display: flex;
@@ -454,13 +452,11 @@ html, body {
   animation: t3Popup 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
 
-  /* Protected outline: outer glow ring matching official ABA KHQR safe-zone */
+  /* Protected outline: clean white card wrap with subtle shadow only */
   border-radius: 28px;
   padding: 14px;
   background: linear-gradient(160deg, #f0f4f8 0%, #e2e8f0 100%);
   box-shadow:
-    0 0 0 3px rgba(225, 37, 27, 0.30),   /* ABA red protective ring     */
-    0 0 0 6px rgba(225, 37, 27, 0.10),   /* Soft outer glow             */
     0 16px 48px rgba(0, 0, 0, 0.22),     /* Elevation shadow            */
     inset 0 1px 0 rgba(255,255,255,0.85); /* Inner top highlight         */
 }
