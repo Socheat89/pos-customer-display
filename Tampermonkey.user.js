@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.4
+// @version      14.5
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -526,46 +526,46 @@
         let items = extractItems(pos);
 
         // ──────────────────────────────────────────────────────────
-        // G. បើ Order ត្រូវបាន Cancel ឬ Cart ទទេ (គ្មាន Items)
+        // G+H. Cache + Empty check (combined, correct order)
+        // ក័១សែជំស្ត័នត្រូវបែ: យក Cache មុននឹកុន Reset ប័យប្រសិនបើលើ នៅលើ PaymentScreen
         // ──────────────────────────────────────────────────────────
         if (items.length === 0) {
-            cachedItems = [];
-            cachedTotal = 0;
-            cachedRef   = '';
-            total       = 0;
+            if (isPayment && cachedItems.length > 0) {
+                // PaymentScreen: Odoo លាកន្រួស orderlines របស់ នឹងយកអ្វី Cache
+                items = cachedItems;
+                if (total === 0) total = cachedTotal;
+                console.debug(`[POS Sync] PaymentScreen: items hidden by Odoo, using cache(${items.length}) total=$${ total}`);
+            } else {
+                // កំពុងអ្វីទាកស្ក័ត: ជំរាកត្រូវ Cancel ឬ្រតែត្រន់ Cart ទឹ
+                cachedItems = [];
+                cachedTotal = 0;
+                cachedRef   = '';
+                total       = 0;
 
-            if (!isCurrentlyReset) {
-                isCurrentlyReset = true;
-                lastKey = '';
-                console.log('[POS Sync] Cart empty / Order cancelled → calling RESET');
-                GM_xmlhttpRequest({ method: 'GET', url: RESET_API });
+                if (!isCurrentlyReset) {
+                    isCurrentlyReset = true;
+                    lastKey = '';
+                    console.log('[POS Sync] Cart empty / Order cancelled → calling RESET');
+                    GM_xmlhttpRequest({ method: 'GET', url: RESET_API });
+                }
+                return;
             }
-            return;
+        }
+
+        // ស្ទុកក័សែ Items មាន ញ Cache អ័បឋែតែឡ
+        if (items.length > 0) {
+            cachedItems = items;
         }
 
         const itemsSum = items.reduce((sum, i) => sum + (Number(i.line_total) || (Number(i.price) * Number(i.qty))), 0);
         if (itemsSum > 0 && (total === 0 || Math.abs(total - itemsSum) > 0.01)) {
             total = Math.round(itemsSum * 100) / 100;
         }
+        if (total > 0) cachedTotal = total;
 
-        // ──────────────────────────────────────────────────────────
-        // H. Cache Management (សម្រាប់តែ Payment Screen ប៉ុណ្ណោះ)
-        // ──────────────────────────────────────────────────────────
-        if (items.length > 0) {
-            cachedItems = items;
-            cachedTotal = total > 0 ? total : itemsSum;
-        } else if (isPayment && cachedItems.length > 0) {
-            // លើ Payment Screen, Odoo លាក់ DOM items -> យកពី Cache
-            items = cachedItems;
-            if (total === 0) total = cachedTotal;
-            console.debug(`[POS Sync] PaymentScreen: using cached items(${items.length}) total=$${total}`);
-        }
-
-        // បើគ្មានទំនិញទាំងស្រុង ត្រូវ Reset ត្រឡប់ទៅ IDLE ភ្លាម
+        // បើគ្មានត្រនឹទាកស្រុង Reset ត្រន់ប់ IDLE
         if (items.length === 0 || total === 0) {
-            cachedItems = [];
-            cachedTotal = 0;
-            cachedRef   = '';
+            cachedItems = []; cachedTotal = 0; cachedRef = '';
             if (!isCurrentlyReset) {
                 isCurrentlyReset = true;
                 lastKey = '';

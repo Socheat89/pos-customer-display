@@ -233,7 +233,7 @@
 
       const imageHtml = itemImg
         ? `<div class="item-thumb-wrapper">
-             <img src="${escapeHtml(itemImg)}" alt="${escapeHtml(cleanName)}" class="item-thumb-img" onerror="this.onerror=null; this.parentElement.classList.add('item-thumb-empty'); this.parentElement.innerHTML='${placeholderSvg}';" />
+             <img src="${escapeHtml(itemImg)}" alt="${escapeHtml(cleanName)}" class="item-thumb-img" />
            </div>`
         : `<div class="item-thumb-wrapper item-thumb-empty">
              ${placeholderSvg}
@@ -249,6 +249,19 @@
         </div>
         <div class="item-line-total">${sym} ${formatAmount(lineTotal)}</div>
       `;
+
+      if (itemImg) {
+        const imgEl = row.querySelector('.item-thumb-img');
+        if (imgEl) {
+          imgEl.addEventListener('error', function() {
+            const parent = this.parentElement;
+            if (parent) {
+              parent.classList.add('item-thumb-empty');
+              parent.innerHTML = placeholderSvg;
+            }
+          });
+        }
+      }
 
       fragment.appendChild(row);
     });
