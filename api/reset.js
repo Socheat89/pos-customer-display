@@ -65,45 +65,56 @@ function confirmationPage(storeId, message, isSuccess) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
   if (req.method === "OPTIONS") return res.status(204).end();
 
   // Resolve store from query param (GET or POST)
-  const storeId = req.query.store || req.body?.store_id || "pos_default";
-  const key     = sessionKey(storeId);
+  const queryStore = req.query.store;
+  const bodyStore  = req.body?.store_id;
+  const storeId    = queryStore || bodyStore;
 
-  // ── GET: reset and return HTML confirmation ──────────────────
-  if (req.method === "GET") {
-    try {
+  try {
+    if (!storeId || storeId === "all" || storeId === "pos_default") {
+      // Clear all POS sessions so reset clears any stuck sessions across all stores
+      try {
+        const keys = await redis.keys("pos_session_*");
+        if (Array.isArray(keys) && keys.length > 0) {
+          await Promise.all(keys.map((k) => redis.del(k)));
+        }
+      } catch (e) {
+        console.warn("[reset] keys scan error:", e.message);
+      }
+      await redis.del("pos_session_pos_default");
+      console.log(`[reset] Cleared ALL pos_session_* keys`);
+    } else {
+      const key = sessionKey(storeId);
       await redis.del(key);
-      console.log(`[reset] GET → cleared store=${storeId} (key=${key})`);
+      console.log(`[reset] Cleared store=${storeId} (key=${key})`);
+    }
+
+    if (req.method === "GET") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(200).send(
-        confirmationPage(storeId, "The Customer Display has been reset to the Welcome screen successfully.", true)
+        confirmationPage(storeId || "All Stores", "The Customer Display has been reset to the Welcome screen successfully.", true)
       );
-    } catch (err) {
-      console.error("[reset] GET Error:", err);
+    }
+
+    return res.status(200).json({
+      success:  true,
+      message:  "Session reset. Display is now IDLE.",
+      store_id: storeId || "all",
+    });
+  } catch (err) {
+    console.error("[reset] Error:", err);
+    if (req.method === "GET") {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       return res.status(500).send(
-        confirmationPage(storeId, "Something went wrong while resetting. Please try again.", false)
+        confirmationPage(storeId || "default", "Something went wrong while resetting. Please try again.", false)
       );
     }
+    return res.status(500).json({ error: "Internal Server Error" });
   }
-
-  // ── POST: reset and return JSON ──────────────────────────────
-  if (req.method === "POST") {
-    try {
-      await redis.del(key);
-      console.log(`[reset] POST → cleared store=${storeId} (key=${key})`);
-      return res.status(200).json({
-        success:  true,
-        message:  "Session reset. Display is now IDLE.",
-        store_id: storeId,
-      });
-    } catch (err) {
-      console.error("[reset] POST Error:", err);
-      return res.status(500).json({ error: "Internal Server Error" });
-    }
-  }
-
-  return res.status(405).json({ error: "Method Not Allowed" });
 }

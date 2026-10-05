@@ -262,11 +262,48 @@ html, body {
 /* Item Row matching Odoo POS Receipt Layout */
 .item-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   padding: 12px 0;
   border-bottom: 1px solid #E2E8F0;
   animation: slideIn 0.25s ease-out;
+}
+
+/* Item Thumbnail (Modern retail aesthetic) */
+.item-thumb-wrapper {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 14px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.item-thumb-wrapper.item-thumb-empty {
+  background: #F8FAFC;
+  border-color: #E2E8F0;
+}
+
+.item-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.item-placeholder-icon {
+  width: 22px;
+  height: 22px;
+  color: #94A3B8;
+  opacity: 0.8;
 }
 
 .item-main-info {
@@ -386,9 +423,10 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.78); /* High-contrast dark backdrop */
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  /* Lighter, balanced background — improves readability over dark navy */
+  background: rgba(203, 213, 225, 0.72);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
   padding: 16px;
   transition: opacity 0.3s ease, visibility 0.3s ease;
   opacity: 1;
@@ -405,7 +443,7 @@ html, body {
    OFFICIAL ABA PAYWAY template3_color SPECIFICATION
    ========================================================= */
 
-/* Template 3 Popup Wrapper (Centers the card on dark backdrop) */
+/* Template 3 Popup Wrapper — with ABA KHQR protected outline ring */
 .t3-modal-wrapper {
   position: relative;
   display: flex;
@@ -415,6 +453,16 @@ html, body {
   max-width: 276px;
   animation: t3Popup 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
+
+  /* Protected outline: outer glow ring matching official ABA KHQR safe-zone */
+  border-radius: 28px;
+  padding: 14px;
+  background: linear-gradient(160deg, #f0f4f8 0%, #e2e8f0 100%);
+  box-shadow:
+    0 0 0 3px rgba(225, 37, 27, 0.30),   /* ABA red protective ring     */
+    0 0 0 6px rgba(225, 37, 27, 0.10),   /* Soft outer glow             */
+    0 16px 48px rgba(0, 0, 0, 0.22),     /* Elevation shadow            */
+    inset 0 1px 0 rgba(255,255,255,0.85); /* Inner top highlight         */
 }
 
 @keyframes t3Popup {
@@ -595,7 +643,7 @@ html, body {
 /* Official footer caption below ticket */
 .t3-caption {
   text-align: center;
-  color: #E2E8F0;
+  color: #475569;  /* Darker caption text — readable on light overlay */
   font-size: 13px;
   font-weight: 500;
   margin: 14px 0 0;
@@ -725,6 +773,7 @@ html, body {
    ========================================================= */
 .hidden {
   opacity: 0 !important;
+  visibility: hidden !important;
   pointer-events: none !important;
 }
 

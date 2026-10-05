@@ -227,8 +227,20 @@
       const lineTotal = item.line_total !== undefined ? Number(item.line_total) : itemPrice;
       const unitLabel = item.uom || item.unit || item.uom_name || item.product_uom || 'ដើម';
       const unitPrice = itemQty > 0 ? (lineTotal / itemQty) : lineTotal;
+      const itemImg   = item.image || item.image_url || item.img || null;
+
+      const placeholderSvg = `<svg class="item-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`;
+
+      const imageHtml = itemImg
+        ? `<div class="item-thumb-wrapper">
+             <img src="${escapeHtml(itemImg)}" alt="${escapeHtml(cleanName)}" class="item-thumb-img" onerror="this.onerror=null; this.parentElement.classList.add('item-thumb-empty'); this.parentElement.innerHTML='${placeholderSvg}';" />
+           </div>`
+        : `<div class="item-thumb-wrapper item-thumb-empty">
+             ${placeholderSvg}
+           </div>`;
 
       row.innerHTML = `
+        ${imageHtml}
         <div class="item-main-info">
           <div class="item-name" title="${escapeHtml(cleanName)}">${escapeHtml(cleanName)}</div>
           <div class="item-sub-detail">
@@ -263,13 +275,35 @@
    * Transition to IDLE — Welcome screen.
    */
   function toIdle() {
-    if (currentState === "IDLE") return;
     console.log("[app] → IDLE");
     currentState      = "IDLE";
     lastRenderedJson  = "";
     lastRenderedQr    = "";
     isTransitioning   = false;
     clearTimeout(successTimer);
+
+    // Hide ABA KHQR modal overlay
+    const khqrModal = document.getElementById("khqr-modal-overlay");
+    if (khqrModal) {
+      khqrModal.classList.add("hidden-modal");
+    }
+    const officialImg = document.getElementById("t3-official-image");
+    if (officialImg) {
+      officialImg.src = "";
+      officialImg.classList.add("hidden");
+    }
+
+    // Reset order items and totals
+    if (els.itemsList) {
+      els.itemsList.innerHTML = "";
+    }
+    if (els.totalAmount) {
+      els.totalAmount.textContent = "$ 0.00";
+    }
+    if (els.orderRefChip) {
+      els.orderRefChip.textContent = "—";
+    }
+
     showScreen("idle");
   }
 
@@ -366,7 +400,13 @@
     isTransitioning = true;
     console.log("[app] → SUCCESS");
     currentState      = "SUCCESS";
-    lastDataSignature = "";
+    lastRenderedJson  = "";
+    lastRenderedQr    = "";
+
+    const khqrModal = document.getElementById("khqr-modal-overlay");
+    if (khqrModal) {
+      khqrModal.classList.add("hidden-modal");
+    }
 
     showScreen("success");
 
@@ -420,7 +460,9 @@
 
       switch (incoming) {
         case "IDLE":
-          if (currentState !== "IDLE") toIdle();
+          if (currentState !== "IDLE" || !screens.pending.classList.contains("hidden")) {
+            toIdle();
+          }
           break;
 
         case "ACTIVE":

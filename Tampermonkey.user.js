@@ -104,56 +104,39 @@
      * ត្រួតពិនិត្យថា Cashier ស្ថិតលើផ្ទាំង Payment ឬអត់
      */
     function isPaymentScreenActive() {
-        // ១. ពិនិត្យតាម Odoo POS JS Model
+        // 1. ពិនិត្យតាម Odoo POS JS Model
         try {
             const pos = getOdooPos();
             if (pos) {
-                if (pos.mainScreen?.name === 'PaymentScreen') return true;
+                const screen = pos.mainScreen?.component?.name || pos.mainScreen?.name;
+                if (screen === 'PaymentScreen') return true;
+                if (screen === 'ProductScreen') return false;
+
                 const currentOrder = pos.get_order?.();
                 if (currentOrder) {
                     const screenData = currentOrder.get_screen_data?.() || currentOrder.screen_data;
                     if (screenData?.name === 'PaymentScreen') return true;
+                    if (screenData?.name === 'ProductScreen') return false;
                 }
             }
         } catch (_) {}
 
-        // ២. ពិនិត្យ DOM Selectors ជាក់លាក់នៃផ្ទាំង Payment
-        const paySelectors = [
-            '.payment-screen',
-            '.screen.payment',
-            '.paymentlines',
-            '.paymentline',
-            '.payment-lines',
-            '.paymentmethods',
-            '.payment-methods',
-            '.button.validate',
-            '.button.validation',
-            'button.validation',
-            'button.validate'
-        ];
-        for (const sel of paySelectors) {
-            if (document.querySelector(sel)) return true;
+        // 2. DOM: បើឃើញ Product Widget / Screen កំពុង Visible មានន័យថាមិនទាន់ចូល Payment Screen ទេ
+        const prodWidget = document.querySelector('.product-screen, .products-widget, .order-widget, .product-list');
+        if (prodWidget && prodWidget.offsetParent !== null) {
+            return false;
         }
 
-        // ៣. ពិនិត្យវត្តមាន Validate Button + Payment Method (ABA KHQR, ACLEDA, Cash)
-        const buttons = document.querySelectorAll('button, .button');
-        let hasValidate = false;
-        let hasPaymentKeyword = false;
-        for (const btn of buttons) {
-            const txt = (btn.innerText || '').trim().toLowerCase();
-            if (txt === 'validate' || txt.includes('validate')) hasValidate = true;
-            if (txt.includes('khqr') || txt.includes('aba') || txt.includes('acleda') || txt.includes('cash')) {
-                hasPaymentKeyword = true;
-            }
+        // 3. DOM: ពិនិត្យវត្តមាន Payment Screen Container ដែលកំពុង Display
+        const payScreen = document.querySelector('.payment-screen, .screen.payment');
+        if (payScreen && payScreen.offsetParent !== null) {
+            return true;
         }
-        if (hasValidate && hasPaymentKeyword) return true;
 
-        // ៤. ពិនិត្យ Payment Button ដែលកំពុង Active / Highlight
-        const activeButtons = document.querySelectorAll('.button.pay, button.pay, .btn-primary.pay');
-        for (let btn of activeButtons) {
-            if (btn.classList.contains('highlight') || btn.classList.contains('active')) {
-                return true;
-            }
+        // 4. DOM: ពិនិត្យវត្តមាន Payment Lines / Methods
+        const payLines = document.querySelector('.paymentlines, .payment-lines, .paymentlines-container, .paymentmethods');
+        if (payLines && payLines.offsetParent !== null) {
+            return true;
         }
 
         return false;
@@ -229,6 +212,86 @@
         return maxTotal;
     }
 
+    const imageCache = {};
+
+    function getBase64FromImg(img) {
+        if (!img || !img.complete || img.naturalWidth === 0) return null;
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.min(img.naturalWidth, 128);
+            canvas.height = Math.min(img.naturalHeight, 128);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', 0.85);
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function findProductImage(productId, productName) {
+        const cacheKey = `${productId || ''}__${productName || ''}`;
+        if (imageCache[cacheKey]) return imageCache[cacheKey];
+
+        // 1. Try from Odoo POS DB
+        try {
+            const pos = getOdooPos();
+            if (pos && pos.db && productId) {
+                const p = pos.db.get_product_by_id?.(productId);
+                if (p?.image_128) {
+                    const src = p.image_128.startsWith('data:') ? p.image_128 : `data:image/png;base64,${p.image_128}`;
+                    imageCache[cacheKey] = src;
+                    return src;
+                }
+                if (p?.image_url) {
+                    imageCache[cacheKey] = p.image_url;
+                    return p.image_url;
+                }
+            }
+        } catch (_) {}
+
+        // 2. Try from DOM Product Catalog Cards by data-product-id
+        if (productId) {
+            const card = document.querySelector(`.product[data-product-id="${productId}"], [data-product-id="${productId}"]`);
+            if (card) {
+                const img = card.querySelector('img');
+                if (img && img.src && !img.src.includes('placeholder')) {
+                    const b64 = getBase64FromImg(img);
+                    const res = b64 || img.src;
+                    imageCache[cacheKey] = res;
+                    return res;
+                }
+            }
+        }
+
+        // 3. Try from DOM Product Catalog Cards by Name match
+        if (productName) {
+            const cleanTarget = String(productName).trim().toLowerCase();
+            const cards = document.querySelectorAll('.product, .product-card, .products-widget article, .product-list div, article');
+            for (const c of cards) {
+                const nameEl = c.querySelector('.product-name, .name, .product-title');
+                const t = nameEl ? nameEl.innerText.trim().toLowerCase() : '';
+                if (t && (t === cleanTarget || cleanTarget.includes(t) || t.includes(cleanTarget))) {
+                    const img = c.querySelector('img');
+                    if (img && img.src && !img.src.includes('placeholder')) {
+                        const b64 = getBase64FromImg(img);
+                        const res = b64 || img.src;
+                        imageCache[cacheKey] = res;
+                        return res;
+                    }
+                }
+            }
+        }
+
+        // 4. Direct Odoo web/image URL
+        if (productId) {
+            const url = `${window.location.origin}/web/image?model=product.product&id=${productId}&field=image_128`;
+            imageCache[cacheKey] = url;
+            return url;
+        }
+
+        return null;
+    }
+
     /**
      * ស្រង់ទំនិញក្នុងកន្ត្រក (Orderlines)
      */
@@ -237,21 +300,23 @@
         if (pos) {
             const order = pos.get_order?.();
             if (order) {
-                const lines = order.get_orderlines?.() || order.orderlines || [];
-                if (Array.isArray(lines) && lines.length > 0) {
+                const rawLines = order.get_orderlines?.() || order.orderlines || order.lines || (typeof order.get_lines === 'function' ? order.get_lines() : []);
+                const lines = Array.isArray(rawLines) ? rawLines : Array.from(rawLines || []);
+                if (lines.length > 0) {
                     return lines.map(l => {
                         let name = '';
                         if (typeof l.get_full_product_name === 'function') name = l.get_full_product_name();
                         else if (l.product?.display_name) name = l.product.display_name;
                         else if (typeof l.get_product === 'function' && l.get_product()?.display_name) name = l.get_product().display_name;
                         else if (l.product_name) name = l.product_name;
+                        else if (l.product?.name) name = l.product.name;
                         else if (l.name) name = l.name;
 
                         let price = 0;
                         if (typeof l.get_unit_display_price === 'function') price = l.get_unit_display_price();
                         else if (typeof l.get_display_price === 'function') price = l.get_display_price();
                         else if (typeof l.get_unit_price === 'function') price = l.get_unit_price();
-                        else if (l.price) price = l.price;
+                        else if (l.price !== undefined) price = l.price;
 
                         let qty = 1;
                         if (typeof l.get_quantity === 'function') qty = l.get_quantity();
@@ -262,11 +327,18 @@
                         if (typeof l.get_display_price === 'function') lineTotal = l.get_display_price();
                         else if (typeof l.get_price_with_tax === 'function') lineTotal = l.get_price_with_tax();
 
+                        let prod = l.product || (typeof l.get_product === 'function' ? l.get_product() : null);
+                        let prodId = prod?.id || l.product_id;
+                        if (Array.isArray(prodId)) prodId = prodId[0];
+
+                        const img = findProductImage(prodId, name);
+
                         return {
                             name: name || 'Item',
                             price: Number(price) || 0,
                             qty: Number(qty) || 1,
-                            line_total: Number(lineTotal) || (Number(price) * Number(qty))
+                            line_total: Number(lineTotal) || (Number(price) * Number(qty)),
+                            image: img || null
                         };
                     });
                 }
@@ -300,7 +372,8 @@
             }
 
             if (name) {
-                items.push({ name, price, qty, line_total: price * qty });
+                const img = findProductImage(null, name);
+                items.push({ name, price, qty, line_total: price * qty, image: img || null });
             }
         });
 
@@ -423,9 +496,9 @@
         let items = extractItems(pos);
 
         // ──────────────────────────────────────────────────────────
-        // G. បើ Order ត្រូវបាន Cancel ឬ Cart ទទេ (គ្មាន Items លើ Product Screen)
+        // G. បើ Order ត្រូវបាន Cancel ឬ Cart ទទេ (គ្មាន Items)
         // ──────────────────────────────────────────────────────────
-        if (!isPayment && items.length === 0) {
+        if (items.length === 0) {
             cachedItems = [];
             cachedTotal = 0;
             cachedRef   = '';
@@ -487,6 +560,12 @@
             if (!cachedRef) cachedRef = 'POS-' + Math.floor(1000 + Math.random() * 9000);
             orderRef = cachedRef;
         } else {
+            if (cachedRef && cachedRef !== orderRef) {
+                console.log(`[POS Sync] New order detected: ${orderRef} (was ${cachedRef}) -> resetting cache`);
+                cachedItems = [];
+                cachedTotal = 0;
+                lastKey = '';
+            }
             cachedRef = orderRef;
         }
 
@@ -494,7 +573,7 @@
         // J. Sync ទៅ Vercel តែប្រសិនបើ Key ផ្លាស់ប្ដូរ
         // ──────────────────────────────────────────────────────────
         const showQR   = isPayment;
-        const itemsKey = items.map(i => `${i.name}_${i.qty}_${i.price}`).join('|');
+        const itemsKey = items.map(i => `${i.name}_${i.qty}_${i.price}_${i.image ? '1' : '0'}`).join('|');
         const key      = `${STORE_ID}|${total}|${showQR}|${itemsKey}|${orderRef}|${currency}`;
 
         if (total > 0 && key !== lastKey) {

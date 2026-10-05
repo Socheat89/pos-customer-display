@@ -345,6 +345,9 @@ export default async function handler(req, res) {
 
     // Save to Redis key per store
     await redis.set(`pos_session_${storeId}`, JSON.stringify(sessionData));
+    if (storeId !== 'pos_default') {
+      await redis.set(`pos_session_pos_default`, JSON.stringify(sessionData));
+    }
 
     console.log(`[order] Saved session for store: ${storeId}, status=${reqStatus}, total=${amountTotal}, ref=${reference}`);
 

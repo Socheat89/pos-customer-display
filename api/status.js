@@ -17,9 +17,29 @@ export default async function handler(req, res) {
 
   try {
     const { store } = req.query;
-    const storeId = store || 'pos_default';
+    let storeId = store || 'pos_default';
 
-    const rawData = await redis.get(`pos_session_${storeId}`);
+    let rawData = await redis.get(`pos_session_${storeId}`);
+
+    // If pos_default has no active session, find if any other store session exists
+    if (!rawData && (!store || store === 'pos_default')) {
+      try {
+        const keys = await redis.keys('pos_session_*');
+        if (Array.isArray(keys) && keys.length > 0) {
+          for (const k of keys) {
+            const val = await redis.get(k);
+            if (val) {
+              const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+              if (parsed && (parsed.status === 'ACTIVE' || parsed.status === 'PENDING' || parsed.status === 'SUCCESS')) {
+                rawData = val;
+                storeId = k.replace('pos_session_', '');
+                break;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
 
     const hasPaywayKeys = Boolean(process.env.ABA_PAYWAY_MERCHANT_ID && (process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY));
     const paywayApiUrl = process.env.ABA_PAYWAY_API_URL || 'default_generate_qr';
