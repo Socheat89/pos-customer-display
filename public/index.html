@@ -25,10 +25,17 @@
   <!-- Main Stylesheet -->
   <link rel="stylesheet" href="/css/style.css?v=20261005_1" />
 
-  <!-- qrcode.js — lightweight QR renderer (no build step required) -->
+  <!-- qrcode.js — lightweight QR renderer (integrity hash removed to prevent SRI mismatch block) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
-          integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSuhUMNZGa6CVog3+p9zjf+6zON5fLk3H2TQ=="
           crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Fallback: jsDelivr CDN if cloudflare fails -->
+  <script>
+    if (typeof QRCode === 'undefined') {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+      document.head.appendChild(s);
+    }
+  </script>
 </head>
 
 <body>
@@ -213,7 +220,7 @@
 </div><!-- /#app -->
 
 <!-- Client logic — cache-busted on every deploy via ?v= timestamp -->
-<script src="/js/app.js?v=20260930_1"></script>
+<script src="/js/app.js?v=20261005_2"></script>
 
 </body>
 </html>

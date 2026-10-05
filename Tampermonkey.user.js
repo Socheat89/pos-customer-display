@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.2
+// @version      14.3
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -102,9 +102,10 @@
 
     /**
      * ត្រួតពិនិត្យថា Cashier ស្ថិតលើផ្ទាំង Payment ឬអត់
+     * Odoo 17/18 OWL — robust multi-strategy detection
      */
     function isPaymentScreenActive() {
-        // 1. ពិនិត្យតាម Odoo POS JS Model
+        // 1. ពិនិត្យតាម Odoo POS JS Model (ត្រឹមត្រូវបំផុត)
         try {
             const pos = getOdooPos();
             if (pos) {
@@ -121,23 +122,53 @@
             }
         } catch (_) {}
 
-        // 2. DOM: បើឃើញ Product Widget / Screen កំពុង Visible មានន័យថាមិនទាន់ចូល Payment Screen ទេ
-        const prodWidget = document.querySelector('.product-screen, .products-widget, .order-widget, .product-list');
-        if (prodWidget && prodWidget.offsetParent !== null) {
-            return false;
+        // 2. URL hash check (Odoo 17 uses #action=payment or similar)
+        if (window.location.hash.toLowerCase().includes('payment')) return true;
+
+        // 3. Check for ABA KHQR / payment method text in visible buttons
+        //    (Most reliable DOM signal for Odoo 17/18 OWL payment screen)
+        const allButtons = document.querySelectorAll('button, .button, [role="button"]');
+        for (const btn of allButtons) {
+            if (btn.offsetParent === null) continue; // skip hidden
+            const txt = (btn.innerText || btn.textContent || '').toLowerCase();
+            if (txt.includes('aba khqr') || txt.includes('khqr') || txt.includes('validate') ||
+                txt.includes('payment') || txt.includes('បង់ប្រាក់') || txt.includes('ទូទាត់')) {
+                return true;
+            }
         }
 
-        // 3. DOM: ពិនិត្យវត្តមាន Payment Screen Container ដែលកំពុង Display
-        const payScreen = document.querySelector('.payment-screen, .screen.payment');
-        if (payScreen && payScreen.offsetParent !== null) {
-            return true;
+        // 4. Odoo 17 OWL — payment screen section/article visible
+        const owlPaySelectors = [
+            '.payment-screen',
+            '.screen.payment',
+            '[class*="payment-screen"]',
+            '[class*="PaymentScreen"]',
+            '.pos-payment',
+            'section.payment',
+            '.payment-method-list',
+            '.payment-methods-list',
+        ];
+        for (const sel of owlPaySelectors) {
+            const el = document.querySelector(sel);
+            if (el && el.offsetParent !== null) return true;
         }
 
-        // 4. DOM: ពិនិត្យវត្តមាន Payment Lines / Methods
-        const payLines = document.querySelector('.paymentlines, .payment-lines, .paymentlines-container, .paymentmethods');
-        if (payLines && payLines.offsetParent !== null) {
-            return true;
-        }
+        // 5. Payment lines or validate button visible
+        const payLines = document.querySelector(
+            '.paymentlines, .payment-lines, .paymentlines-container, .paymentmethods'
+        );
+        if (payLines && payLines.offsetParent !== null) return true;
+
+        const validateBtn = document.querySelector(
+            'button.validate, .button.validate, button.validation, [class*="validate"]'
+        );
+        if (validateBtn && validateBtn.offsetParent !== null) return true;
+
+        // 6. ProductScreen check — if product grid is visible we're NOT on payment
+        const prodWidget = document.querySelector(
+            '.product-screen, .products-widget, .product-list, [class*="product-screen"]'
+        );
+        if (prodWidget && prodWidget.offsetParent !== null) return false;
 
         return false;
     }
