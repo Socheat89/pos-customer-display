@@ -88,10 +88,21 @@ export default async function handler(req, res) {
         console.warn("[reset] keys scan error:", e.message);
       }
       await redis.del("pos_session_pos_default");
+      await redis.set("pos_session_pos_default", JSON.stringify({
+        status: "IDLE",
+        store_id: "pos_default",
+        updated_at: Date.now()
+      }), { ex: 3600 });
       console.log(`[reset] Cleared ALL pos_session_* keys`);
     } else {
       const key = sessionKey(storeId);
       await redis.del(key);
+      await redis.del("pos_session_pos_default");
+      await redis.set(key, JSON.stringify({
+        status: "IDLE",
+        store_id: storeId,
+        updated_at: Date.now()
+      }), { ex: 3600 });
       console.log(`[reset] Cleared store=${storeId} (key=${key})`);
     }
 

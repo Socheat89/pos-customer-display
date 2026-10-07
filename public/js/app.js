@@ -13,7 +13,7 @@
 
   // ── Constants ──────────────────────────────────────────────
   const POLL_INTERVAL_MS = 250;
-  const SUCCESS_RESET_MS = 5000;
+  const SUCCESS_RESET_MS = 4000;
 
   // Read ?store= from URL — each display screen has its own store ID.
   // Example: https://your-app.vercel.app?store=pos_48002
@@ -25,13 +25,14 @@
 
 
   // ── State ───────────────────────────────────────────────────
-  let currentState      = "IDLE";  // 'IDLE' | 'PENDING' | 'SUCCESS'
-  let pollTimer         = null;
-  let successTimer      = null;
-  let isTransitioning   = false;
-  let isPolling         = false;
-  let lastRenderedJson  = "";
-  let lastRenderedQr    = "";
+  let currentState          = "IDLE";  // 'IDLE' | 'PENDING' | 'SUCCESS'
+  let pollTimer             = null;
+  let successTimer          = null;
+  let isTransitioning       = false;
+  let isPolling             = false;
+  let lastRenderedJson      = "";
+  let lastRenderedQr        = "";
+  let lastHandledSuccessRef = "";
 
   // ── DOM References ──────────────────────────────────────────
   const screens = {
@@ -381,6 +382,7 @@
   function toPending(data) {
     console.log("[app] → PENDING", data.reference, "items:", (data.items || []).length, "total:", data.amount_total, "show_qr:", data.show_qr);
     currentState = "PENDING";
+    lastHandledSuccessRef = "";
 
     // Update left panel
     if (els.orderRefChip) {
@@ -587,7 +589,10 @@
 
         case "SUCCESS":
         case "PAID":
-          if (currentState !== "SUCCESS") toSuccess();
+          if (currentState !== "SUCCESS" && lastHandledSuccessRef !== (data.reference || "SUCCESS")) {
+            lastHandledSuccessRef = data.reference || "SUCCESS";
+            toSuccess();
+          }
           break;
 
         default:
