@@ -131,8 +131,8 @@
       img.src = qrString;
       img.alt = "ABA KHQR Payment Code";
       img.className = "pw-khqr-qr-image";
-      img.style.width = "216px";
-      img.style.height = "216px";
+      img.style.width = "190px";
+      img.style.height = "190px";
       img.onerror = () => {
         container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
       };
@@ -147,8 +147,8 @@
     try {
       new QRCode(container, {
         text:           qrString,
-        width:          216,
-        height:         216,
+        width:          190,
+        height:         190,
         colorDark:      "#000000",
         colorLight:     "#ffffff",
         correctLevel:   QRCode.CorrectLevel.M,
@@ -160,8 +160,8 @@
       try {
         new QRCode(container, {
           text:           qrString,
-          width:          216,
-          height:         216,
+          width:          190,
+          height:         190,
           colorDark:      "#000000",
           colorLight:     "#ffffff",
           correctLevel:   QRCode.CorrectLevel.L,
@@ -174,11 +174,11 @@
 
     // 2. Secondary: High-reliability QR Image endpoint fallback
     const img = document.createElement("img");
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=216x216&data=${encodeURIComponent(qrString)}`;
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(qrString)}`;
     img.alt = "ABA KHQR Payment Code";
     img.className = "pw-khqr-qr-image";
-    img.style.width = "216px";
-    img.style.height = "216px";
+    img.style.width = "190px";
+    img.style.height = "190px";
     img.onerror = () => {
       container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
     };
@@ -345,21 +345,24 @@
 
     // Update ABA KHQR Modal Card fields (Official template3_color specification)
     const isKHR = (data.currency || "USD").toUpperCase() === "KHR";
-    const symKhqr = isKHR ? "៛" : "$";
     const formattedKhqrAmt = isKHR
       ? Number(data.amount_total || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
       : formatAmount(data.amount_total || 0);
 
     const khqrAmountEl = document.getElementById("khqr_amount") || els.amountValue;
     if (khqrAmountEl) {
-      khqrAmountEl.textContent = `${symKhqr} ${formattedKhqrAmt}`;
+      if (isKHR) {
+        khqrAmountEl.textContent = `៛ ${formattedKhqrAmt}`;
+      } else {
+        khqrAmountEl.innerHTML = `${formattedKhqrAmt} <span style="font-size: 0.65em; font-weight: 600; color: #4B5563; margin-left: 2px;">USD</span>`;
+      }
     }
     if (els.amountCurrency) {
       els.amountCurrency.textContent = (data.currency || "USD").toUpperCase();
     }
     const merchantEl = document.getElementById("khqr_merchant_name") || document.getElementById("khqr-ticket-merchant");
     if (merchantEl) {
-      merchantEl.textContent = data.merchant_name || "Coffee Khlaing";
+      merchantEl.textContent = data.merchant_name || data.name || "SO CHEAT Official";
     }
 
     // Toggle ABA KHQR Modal Overlay visibility based on show_qr flag
@@ -374,8 +377,22 @@
 
     if (khqrModal) {
       if (showQR) {
-        // If ABA PayWay API returned official pre-rendered Base64 PNG image (template3_color)
-        if (data.qr_image) {
+        const qrPayload = data.qr_string;
+
+        // Prioritize custom square template when qr_string is available
+        if (qrPayload) {
+          if (modalWrapper) modalWrapper.classList.remove("t3-wrapper-raw-image");
+          if (officialImg)  officialImg.classList.add("hidden");
+          if (brandHeader)  brandHeader.style.display = "flex";
+          if (t3Card)       t3Card.style.display = "flex";
+          if (t3Caption)    t3Caption.style.display = "block";
+
+          if (qrPayload !== lastRenderedQr) {
+            lastRenderedQr = qrPayload;
+            renderQRCode(qrPayload);
+          }
+        } else if (data.qr_image) {
+          // Fallback if only raw base64 image is provided
           if (modalWrapper) modalWrapper.classList.add("t3-wrapper-raw-image");
           if (officialImg) {
             officialImg.src = data.qr_image;
@@ -384,19 +401,6 @@
           if (brandHeader) brandHeader.style.display = "none";
           if (t3Card)      t3Card.style.display = "none";
           if (t3Caption)   t3Caption.style.display = "none";
-        } else {
-          // Fallback: Render dynamic QR into CSS template3 card
-          if (modalWrapper) modalWrapper.classList.remove("t3-wrapper-raw-image");
-          if (officialImg) officialImg.classList.add("hidden");
-          if (brandHeader) brandHeader.style.display = "flex";
-          if (t3Card)      t3Card.style.display = "flex";
-          if (t3Caption)   t3Caption.style.display = "block";
-
-          const qrPayload = data.qr_string;
-          if (qrPayload && qrPayload !== lastRenderedQr) {
-            lastRenderedQr = qrPayload;
-            renderQRCode(qrPayload);
-          }
         }
         khqrModal.classList.remove("hidden-modal");
       } else {
