@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.6
+// @version      14.7
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -727,6 +727,13 @@
                 url: VERCEL_API,
                 headers: { 'Content-Type': 'application/json' },
                 data: JSON.stringify(payload),
+                onload: function(res) {
+                    if (res.status >= 400) {
+                        console.error('❌ [POS→Vercel] HTTP ' + res.status + ':', res.responseText);
+                    } else {
+                        console.log('✅ [POS→Vercel] Synced successfully to Vercel (HTTP ' + res.status + ')');
+                    }
+                },
                 onerror: function(err) {
                     console.error('❌ [POS→Vercel] Sync failed:', err);
                 }

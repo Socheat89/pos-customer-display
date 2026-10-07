@@ -300,9 +300,10 @@ export default async function handler(req, res) {
     }
 
     let paywayDebug = null;
+    let paywayRes = null;
     // 2. Otherwise generate dynamic KHQR via ABA PayWay Sandbox / Production API
     if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0) {
-      const paywayRes = await fetchABAPaywayQR({
+      paywayRes = await fetchABAPaywayQR({
         storeId,
         reference,
         amount: amountTotal,
@@ -334,7 +335,7 @@ export default async function handler(req, res) {
       qrString = process.env.DEFAULT_KHQR_STRING;
     }
 
-    const tran_id_used = paywayRes?.tran_id || tran_id;
+    const tran_id_used = paywayRes?.tran_id || String(reference || `T${Date.now()}`).replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 20);
 
     // Standardize session data for Upstash Redis
     const sessionData = {
