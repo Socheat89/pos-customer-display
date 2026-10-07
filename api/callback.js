@@ -1,96 +1,183 @@
 /**
  * api/callback.js
  * ---------------
- * POST /api/callback?store=<store_id>
+ * Receives payment confirmations from ABA PayWay or test calls.
+ * Supports BOTH GET and POST requests.
  *
- * Receives ABA PayWay payment notification.
- * When payment is confirmed (status == '00' or 'SUCCESS'),
- * updates the Redis session status for the specific store to 'SUCCESS'.
- *
- * Configure ABA PayWay IPN URL as:
- *   https://your-app.vercel.app/api/callback?store=store_a
- *
- * ABA PayWay success indicators:
- *   - Field "status" === "00"       (numeric success code)
- *   - Field "status" === "SUCCESS"  (string variant)
+ * Examples:
+ *   POST /api/callback?store=pos_18  { "status": 0, "tran_id": "..." }
+ *   GET  /api/callback?store=pos_18&status=00
+ *   GET  /api/callback?store=pos_18&status=SUCCESS
  */
 
 import { Redis } from "@upstash/redis";
 
 const redis = Redis.fromEnv();
 
-/** Build a namespaced Redis key per store (mirrors order.js). */
-function sessionKey(storeId) {
-  const safe = String(storeId || "default").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
-  return `pos_session_${safe}`;
-}
-
-/** Normalise status values from ABA PayWay to a boolean. */
+/** Normalise any status value from ABA PayWay or test call to a boolean. */
 function isPaymentSuccessful(status) {
-  if (!status) return false;
+  if (status === undefined || status === null) return false;
   const s = String(status).trim().toUpperCase();
-  return s === "00" || s === "SUCCESS";
+  return (
+    s === "0" ||
+    s === "00" ||
+    s === "SUCCESS" ||
+    s === "APPROVED" ||
+    s === "PAID" ||
+    s === "OK" ||
+    s === "TRUE" ||
+    s === "1"
+  );
 }
 
 export default async function handler(req, res) {
-  if (req.method === "OPTIONS") return res.status(204).end();
+  // CORS Headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
+  if (req.method === "OPTIONS") return res.status(200).end();
+
+  if (req.method !== "POST" && req.method !== "GET") {
+    return res.status(405).json({ error: "Method Not Allowed. Use GET or POST." });
   }
 
   try {
-    const body = req.body;
+    // Parse body safely
+    let body = {};
+    if (typeof req.body === "object" && req.body !== null) {
+      body = req.body;
+    } else if (typeof req.body === "string" && req.body.length > 0) {
+      try {
+        body = JSON.parse(req.body);
+      } catch (_) {
+        try {
+          body = Object.fromEntries(new URLSearchParams(req.body));
+        } catch (_) {}
+      }
+    }
 
-    // Resolve store — prefer query param, fallback to body field
-    const storeId = req.query.store || body?.store_id || body?.pos_id || "default";
-    const key     = sessionKey(storeId);
+    const query = req.query || {};
 
-    // Extract payment status from ABA PayWay
-    const paymentStatus = body?.status ?? body?.tran_status ?? null;
+    // Extract transaction identifiers
+    const tranId    = query.tran_id || body.tran_id || query.tranId || body.tranId || null;
+    const reference = query.reference || body.reference || query.ref || body.ref || null;
 
-    if (!isPaymentSuccessful(paymentStatus)) {
-      console.warn(`[callback] Non-success status "${paymentStatus}" for store=${storeId}`);
+    // Resolve storeId
+    let storeId = query.store || query.store_id || body.store_id || body.store || body.pos_id || null;
+
+    // Lookup storeId by tranId in Redis if not directly provided
+    if (!storeId && tranId) {
+      try {
+        const mapped = await redis.get(`payway_tran_${tranId}`);
+        if (mapped) storeId = String(mapped);
+      } catch (_) {}
+    }
+
+    // Lookup storeId by reference in Redis if still missing
+    if (!storeId && reference) {
+      try {
+        const mapped = await redis.get(`payway_ref_${reference}`);
+        if (mapped) storeId = String(mapped);
+      } catch (_) {}
+    }
+
+    // If still missing, check if any active/pending session exists in Redis
+    if (!storeId) {
+      try {
+        const keys = await redis.keys("pos_session_*");
+        for (const k of keys || []) {
+          if (k === "pos_session_pos_default") continue;
+          const val = await redis.get(k);
+          if (val) {
+            const parsed = typeof val === "string" ? JSON.parse(val) : val;
+            if (parsed && (parsed.status === "ACTIVE" || parsed.status === "PENDING")) {
+              storeId = k.replace("pos_session_", "");
+              break;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (!storeId) {
+      storeId = "pos_default";
+    }
+
+    // Extract payment status
+    const rawStatus =
+      query.status ??
+      body.status ??
+      query.tran_status ??
+      body.tran_status ??
+      query.code ??
+      body.code ??
+      query.payment_status ??
+      body.payment_status ??
+      null;
+
+    // Check if status is a success or if user explicitly requested a test confirmation
+    const isSuccess =
+      isPaymentSuccessful(rawStatus) ||
+      query.set_success === "true" ||
+      query.test === "true" ||
+      query.force === "true";
+
+    // If no status provided at all and no test flag on a GET request without query, return info
+    if (rawStatus === null && !isSuccess && req.method === "GET" && !query.store) {
       return res.status(200).json({
-        success:          false,
-        message:          "Payment not confirmed. State unchanged.",
-        received_status:  paymentStatus,
-        store_id:         storeId,
+        success: true,
+        message: "ABA PayWay Callback endpoint is online. Call with ?store=<id>&status=00 to confirm payment.",
+        supported_methods: ["GET", "POST"]
       });
     }
 
-    // Fetch the current session for this store
-    const raw = await redis.get(key);
-
-    if (!raw) {
-      console.warn(`[callback] SUCCESS received but no active session for store=${storeId}`);
+    if (!isSuccess) {
+      console.warn(`[callback] Non-success status "${rawStatus}" for store=${storeId}`);
       return res.status(200).json({
-        success:  false,
-        message:  "No active session to update.",
+        success: false,
+        message: "Payment status is not confirmed. Session unchanged.",
+        received_status: rawStatus,
         store_id: storeId,
       });
     }
 
-    const session = typeof raw === "string" ? JSON.parse(raw) : raw;
+    // Update Redis session
+    const key = `pos_session_${storeId}`;
+    const raw = await redis.get(key);
+
+    let session = {};
+    if (raw) {
+      session = typeof raw === "string" ? JSON.parse(raw) : raw;
+    }
 
     const updatedSession = {
       ...session,
-      status:   "SUCCESS",
-      paid_at:  new Date().toISOString(),
+      status: "SUCCESS",
+      paid_at: new Date().toISOString(),
+      updated_at: Date.now(),
+      paid_tran_id: tranId || session.tran_id || null,
     };
 
-    // Keep SUCCESS visible for 5 minutes, then TTL auto-cleans
+    // Save to Redis key per store (TTL 300s)
     await redis.set(key, JSON.stringify(updatedSession), { ex: 300 });
 
-    console.log(`[callback] Payment SUCCESS → store=${storeId}, reference=${session.reference}`);
+    // Also mirror to pos_default
+    if (storeId !== "pos_default") {
+      await redis.set("pos_session_pos_default", JSON.stringify(updatedSession), { ex: 300 });
+    }
+
+    console.log(`[callback] Payment SUCCESS confirmed! store=${storeId}, ref=${session.reference || tranId}`);
 
     return res.status(200).json({
-      success:  true,
-      message:  "Payment confirmed. Session updated to SUCCESS.",
+      success: true,
+      status: "SUCCESS",
+      message: "Payment confirmed. Customer display updated to SUCCESS.",
       store_id: storeId,
+      reference: session.reference || tranId,
     });
   } catch (err) {
     console.error("[callback] Error:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ error: "Internal Server Error", message: err.message });
   }
 }

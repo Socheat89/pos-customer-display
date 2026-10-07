@@ -1,6 +1,59 @@
 import { Redis } from '@upstash/redis';
+import crypto from 'crypto';
 
 const redis = Redis.fromEnv();
+
+/** Format UTC req_time matching ABA PayWay standard (YYYYMMDDHHmmss) */
+function getUtcReqTime() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}` +
+         `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
+}
+
+/** Check transaction with ABA PayWay check-transaction-2 API */
+async function checkPaywayTransaction(tranId) {
+  const merchantId = process.env.ABA_PAYWAY_MERCHANT_ID;
+  const apiKey     = process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY;
+  let apiUrl       = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/generate-qr';
+
+  if (!merchantId || !apiKey || !tranId) return false;
+
+  let checkUrl = apiUrl.includes('checkout.payway.com.kh')
+    ? 'https://checkout.payway.com.kh/api/payment-gateway/v1/payments/check-transaction-2'
+    : 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/check-transaction-2';
+
+  const req_time = getUtcReqTime();
+  // Hash for check-transaction-2: HMAC-SHA512(req_time + merchant_id + tran_id)
+  const hash = crypto.createHmac('sha512', apiKey).update(req_time + merchantId + tranId).digest('base64');
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+
+    const res = await fetch(checkUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ req_time, merchant_id: merchantId, tran_id: tranId, hash }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    if (res.ok) {
+      const data = await res.json();
+      const code = String(data?.status?.code ?? data?.status ?? '');
+      const paymentStatus = String(data?.payment_status ?? '').toUpperCase();
+      // Code 00 or 0 or PAID or SUCCESS means customer successfully paid!
+      if (code === '00' || code === '0' || paymentStatus === 'PAID' || paymentStatus === 'SUCCESS') {
+        console.log(`[status:payway-poll] Transaction confirmed PAID for tran_id=${tranId}`);
+        return true;
+      }
+    }
+  } catch (err) {
+    // Non-critical background poll error
+  }
+  return false;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -53,10 +106,32 @@ export default async function handler(req, res) {
     }
 
     const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+
+    // Auto-check ABA PayWay if session is currently waiting for payment
+    if (data && (data.status === 'ACTIVE' || data.status === 'PENDING') && (data.tran_id || data.reference)) {
+      const tranIdToCheck = data.tran_id || data.reference;
+      const cooldownKey = `payway_poll_cd_${tranIdToCheck}`;
+      try {
+        const inCooldown = await redis.get(cooldownKey);
+        if (!inCooldown) {
+          await redis.set(cooldownKey, "1", { ex: 2 });
+          const isPaid = await checkPaywayTransaction(tranIdToCheck);
+          if (isPaid) {
+            data.status = 'SUCCESS';
+            data.paid_at = new Date().toISOString();
+            data.updated_at = Date.now();
+            await redis.set(`pos_session_${storeId}`, JSON.stringify(data), { ex: 300 });
+            if (storeId !== 'pos_default') {
+              await redis.set(`pos_session_pos_default`, JSON.stringify(data), { ex: 300 });
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
     data._diagnostic = { hasPaywayKeys, paywayApiUrl };
     return res.status(200).json(data);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 }
-

@@ -176,6 +176,7 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
       console.log(`[payway] API Response for store=${storeId}:`, data);
       if (data.qrImage || data.qrString || data.status?.code === '0' || data.status === '0' || data.status === 0 || data.status === 'SUCCESS') {
         return {
+          tran_id,
           qrString: data.qrString || data.qr_string || null,
           qrImage: data.qrImage || data.qr_image || null,
           abapay_deeplink: data.abapay_deeplink || null,
@@ -245,10 +246,17 @@ function generateEMVCoKHQR({ merchantName = "SK COSMETIC", city = "Phnom Penh", 
 export default async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      success: true,
+      message: 'Order API is online. Submit orders using POST.',
+      store: req.query.store || 'pos_default'
+    });
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   try {
@@ -326,12 +334,15 @@ export default async function handler(req, res) {
       qrString = process.env.DEFAULT_KHQR_STRING;
     }
 
+    const tran_id_used = paywayRes?.tran_id || tran_id;
+
     // Standardize session data for Upstash Redis
     const sessionData = {
       status: reqStatus,
       store_id: storeId,
       name: reference,
       reference: reference,
+      tran_id: tran_id_used,
       amount_total: amountTotal,
       currency: currency,
       items: items,
@@ -347,6 +358,18 @@ export default async function handler(req, res) {
     await redis.set(`pos_session_${storeId}`, JSON.stringify(sessionData));
     if (storeId !== 'pos_default') {
       await redis.set(`pos_session_pos_default`, JSON.stringify(sessionData));
+    }
+
+    // Save mapping tran_id -> storeId & reference -> storeId in Redis for 1 hour so callback can always find the store!
+    if (tran_id_used) {
+      try {
+        await redis.set(`payway_tran_${tran_id_used}`, storeId, { ex: 3600 });
+      } catch (_) {}
+    }
+    if (reference) {
+      try {
+        await redis.set(`payway_ref_${reference}`, storeId, { ex: 3600 });
+      } catch (_) {}
     }
 
     console.log(`[order] Saved session for store: ${storeId}, status=${reqStatus}, total=${amountTotal}, ref=${reference}`);
