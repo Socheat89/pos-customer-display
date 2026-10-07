@@ -457,14 +457,14 @@ html, body {
 
   /* Clean solid light neutral gray squarcle card container matching reference */
   border-radius: 26px;
-  padding: 26px 85px 22px;
+  padding: 16px 85px 16px;
   background: #E8E9EC;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
 /* When showing direct pre-rendered ABA PayWay official Base64 image, keep matching wrapper */
 .t3-modal-wrapper.t3-wrapper-raw-image {
-  padding: 26px 85px 22px !important;
+  padding: 16px 85px 16px !important;
   max-width: 386px !important;
   background: #E8E9EC !important;
   border-radius: 26px !important;
@@ -501,13 +501,13 @@ html, body {
 
 /* Official PayWay Pre-rendered template3_color Base64 Image */
 .t3-official-image {
-  max-width: 206px;
+  max-width: 216px;
   width: 100%;
   height: auto;
-  border-radius: 18px;
+  border-radius: 0;
   display: block;
   margin: 0 auto;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
   animation: modalPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

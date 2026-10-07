@@ -437,10 +437,23 @@
 
     if (khqrModal) {
       if (showQR) {
-        const qrPayload = data.qr_string;
+        // Prioritize official Base64 pre-rendered image from ABA PayWay
+        if (data.qr_image) {
+          const rawImg = data.qr_image;
+          const base64Src = rawImg.startsWith("data:") || rawImg.startsWith("http")
+            ? rawImg
+            : `data:image/png;base64,${rawImg}`;
 
-        // Prioritize custom square template when qr_string is available
-        if (qrPayload) {
+          if (modalWrapper) modalWrapper.classList.add("t3-wrapper-raw-image");
+          if (officialImg) {
+            officialImg.src = base64Src;
+            officialImg.classList.remove("hidden");
+          }
+          if (brandHeader) brandHeader.style.display = "none";
+          if (t3Card)      t3Card.style.display = "none";
+          if (t3Caption)   t3Caption.style.display = "none";
+        } else if (data.qr_string) {
+          const qrPayload = data.qr_string;
           if (modalWrapper) modalWrapper.classList.remove("t3-wrapper-raw-image");
           if (officialImg)  officialImg.classList.add("hidden");
           if (brandHeader)  brandHeader.style.display = "flex";
@@ -451,16 +464,6 @@
             lastRenderedQr = qrPayload;
             renderQRCode(qrPayload);
           }
-        } else if (data.qr_image) {
-          // Fallback if only raw base64 image is provided
-          if (modalWrapper) modalWrapper.classList.add("t3-wrapper-raw-image");
-          if (officialImg) {
-            officialImg.src = data.qr_image;
-            officialImg.classList.remove("hidden");
-          }
-          if (brandHeader) brandHeader.style.display = "none";
-          if (t3Card)      t3Card.style.display = "none";
-          if (t3Caption)   t3Caption.style.display = "none";
         }
         khqrModal.classList.remove("hidden-modal");
       } else {
