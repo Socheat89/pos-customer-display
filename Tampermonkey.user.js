@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.5
+// @version      14.6
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -244,8 +244,34 @@
 
     const imageCache = {};
 
+    function fetchImageAsBase64(url, callback) {
+        if (!url || typeof GM_xmlhttpRequest === 'undefined') return;
+        if (url.startsWith('data:')) {
+            if (callback) callback(url);
+            return;
+        }
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: url,
+            responseType: 'blob',
+            onload: function(res) {
+                if (res.response) {
+                    const reader = new FileReader();
+                    reader.onloadend = function() {
+                        if (reader.result && callback) {
+                            callback(reader.result);
+                        }
+                    };
+                    reader.readAsDataURL(res.response);
+                }
+            }
+        });
+    }
+
     function getBase64FromImg(img) {
-        if (!img || !img.complete || img.naturalWidth === 0) return null;
+        if (!img) return null;
+        if (img.src && img.src.startsWith('data:')) return img.src;
+        if (!img.complete || img.naturalWidth === 0) return null;
         try {
             const canvas = document.createElement('canvas');
             canvas.width = Math.min(img.naturalWidth, 128);
@@ -258,63 +284,102 @@
         }
     }
 
-    function findProductImage(productId, productName) {
-        const cacheKey = `${productId || ''}__${productName || ''}`;
+    function cleanProductName(name, qty) {
+        if (!name) return '';
+        let s = String(name).trim();
+        // Remove leading quantity followed by whitespace or newline
+        s = s.replace(/^\d+[\s\r\n]+/, '').trim();
+        // Remove attached quantity prefix, e.g. "1002-..." when qty=1 -> "002-..."
+        if (qty && s.startsWith(String(qty)) && /^\d{4,}/.test(s)) {
+            const stripped = s.slice(String(qty).length);
+            if (/^\d{3}-/.test(stripped) || /^[A-Za-z]/.test(stripped)) {
+                s = stripped;
+            }
+        }
+        if (s.startsWith('1') && /^1[A-Z]\s+/.test(s)) {
+            s = s.slice(1).trim();
+        }
+        return s;
+    }
+
+    function findProductImage(productId, productName, qty) {
+        const cleanName = cleanProductName(productName, qty);
+        const lowerName = cleanName.toLowerCase();
+        const cacheKey  = `${productId || ''}__${lowerName}`;
         if (imageCache[cacheKey]) return imageCache[cacheKey];
+
+        if (productId && imageCache[`id:${productId}`]) {
+            return imageCache[`id:${productId}`];
+        }
+        if (lowerName && imageCache[`name:${lowerName}`]) {
+            return imageCache[`name:${lowerName}`];
+        }
 
         // 1. Try from Odoo POS DB
         try {
             const pos = getOdooPos();
-            if (pos && pos.db && productId) {
-                const p = pos.db.get_product_by_id?.(productId);
-                if (p?.image_128) {
-                    const src = p.image_128.startsWith('data:') ? p.image_128 : `data:image/png;base64,${p.image_128}`;
+            if (pos) {
+                const prod = (pos.db?.get_product_by_id?.(productId)) ||
+                             (pos.db?.product_by_id?.[productId]) ||
+                             (pos.models?.['product.product']?.get?.(productId));
+                if (prod?.image_128 && prod.image_128.length > 30) {
+                    const src = prod.image_128.startsWith('data:') ? prod.image_128 : `data:image/png;base64,${prod.image_128}`;
                     imageCache[cacheKey] = src;
                     return src;
-                }
-                if (p?.image_url) {
-                    imageCache[cacheKey] = p.image_url;
-                    return p.image_url;
                 }
             }
         } catch (_) {}
 
-        // 2. Try from DOM Product Catalog Cards by data-product-id
-        if (productId) {
-            const card = document.querySelector(`.product[data-product-id="${productId}"], [data-product-id="${productId}"]`);
-            if (card) {
-                const img = card.querySelector('img');
-                if (img && img.src && !img.src.includes('placeholder')) {
-                    const b64 = getBase64FromImg(img);
-                    const res = b64 || img.src;
-                    imageCache[cacheKey] = res;
-                    return res;
-                }
-            }
-        }
+        // 2. Scan Catalog Cards in DOM
+        const cards = document.querySelectorAll('.product, .product-card, article.product, [data-product-id]');
+        for (const c of cards) {
+            const cardId = c.dataset?.productId || c.getAttribute('data-product-id') || c.__owl__?.component?.props?.product?.id;
+            const nameEl = c.querySelector('.product-name, .name, .product-title, .product-content');
+            const cardName = (nameEl ? nameEl.innerText : c.innerText || '').trim().toLowerCase();
 
-        // 3. Try from DOM Product Catalog Cards by Name match
-        if (productName) {
-            const cleanTarget = String(productName).trim().toLowerCase();
-            const cards = document.querySelectorAll('.product, .product-card, .products-widget article, .product-list div, article');
-            for (const c of cards) {
-                const nameEl = c.querySelector('.product-name, .name, .product-title');
-                const t = nameEl ? nameEl.innerText.trim().toLowerCase() : '';
-                if (t && (t === cleanTarget || cleanTarget.includes(t) || t.includes(cleanTarget))) {
-                    const img = c.querySelector('img');
-                    if (img && img.src && !img.src.includes('placeholder')) {
-                        const b64 = getBase64FromImg(img);
-                        const res = b64 || img.src;
-                        imageCache[cacheKey] = res;
-                        return res;
+            const matchId = productId && String(cardId) === String(productId);
+            const matchName = lowerName && cardName && (cardName === lowerName || cardName.includes(lowerName) || lowerName.includes(cardName));
+
+            if (matchId || matchName) {
+                const img = c.querySelector('img');
+                let imgUrl = img?.src;
+                if (!imgUrl) {
+                    const bgEl = c.querySelector('.product-img, [style*="background-image"]');
+                    const m = (bgEl?.style?.backgroundImage || '').match(/url\(['"]?(.*?)['"]?\)/);
+                    if (m) imgUrl = m[1];
+                }
+
+                if (imgUrl && !imgUrl.includes('placeholder')) {
+                    const b64 = img ? getBase64FromImg(img) : null;
+                    if (b64) {
+                        imageCache[cacheKey] = b64;
+                        if (productId) imageCache[`id:${productId}`] = b64;
+                        if (lowerName) imageCache[`name:${lowerName}`] = b64;
+                        return b64;
                     }
+                    // Fetch as Base64 in background
+                    fetchImageAsBase64(imgUrl, (resB64) => {
+                        if (resB64) {
+                            imageCache[cacheKey] = resB64;
+                            if (productId) imageCache[`id:${productId}`] = resB64;
+                            if (lowerName) imageCache[`name:${lowerName}`] = resB64;
+                        }
+                    });
+                    imageCache[cacheKey] = imgUrl;
+                    return imgUrl;
                 }
             }
         }
 
-        // 4. Direct Odoo web/image URL
+        // 3. Fallback: Request direct Odoo web/image as Base64 by productId
         if (productId) {
             const url = `${window.location.origin}/web/image?model=product.product&id=${productId}&field=image_128`;
+            fetchImageAsBase64(url, (resB64) => {
+                if (resB64) {
+                    imageCache[cacheKey] = resB64;
+                    imageCache[`id:${productId}`] = resB64;
+                }
+            });
             imageCache[cacheKey] = url;
             return url;
         }
@@ -361,7 +426,8 @@
                         let prodId = prod?.id || l.product_id;
                         if (Array.isArray(prodId)) prodId = prodId[0];
 
-                        const img = findProductImage(prodId, name);
+                        name = cleanProductName(name, qty);
+                        const img = findProductImage(prodId, name, qty);
 
                         return {
                             name: name || 'Item',
@@ -381,29 +447,63 @@
         lines.forEach(l => {
             if (l.closest('.products-widget') || l.closest('.product-list')) return;
 
-            const nameEl  = l.querySelector('.product-name, .name, .product-title');
-            const priceEl = l.querySelector('.price, .product-price');
-            const qtyEl   = l.querySelector('.qty, .quantity');
+            let name = '';
+            let price = 0;
+            let qty = 1;
+            let prodId = null;
 
-            let name  = nameEl  ? nameEl.innerText.trim()  : '';
-            let price = priceEl ? parseFloat(priceEl.innerText.replace(/[^0-9.]/g, '')) || 0 : 0;
-            let qty   = qtyEl   ? parseFloat(qtyEl.innerText.replace(/[^0-9.]/g, ''))   || 1 : 1;
+            // Try OWL component on line
+            try {
+                const comp = l.__owl__?.component;
+                const line = comp?.props?.line || comp?.line;
+                if (line) {
+                    const prod = line.product || (typeof line.get_product === 'function' ? line.get_product() : null);
+                    if (prod) {
+                        prodId = prod.id;
+                        name = line.get_full_product_name?.() || prod.display_name || prod.name || '';
+                    }
+                    if (typeof line.get_unit_display_price === 'function') price = line.get_unit_display_price();
+                    else if (typeof line.get_display_price === 'function') price = line.get_display_price();
+                    else if (line.price !== undefined) price = line.price;
+
+                    if (typeof line.get_quantity === 'function') qty = line.get_quantity();
+                    else if (line.quantity !== undefined) qty = line.quantity;
+                    else if (line.qty !== undefined) qty = line.qty;
+                }
+            } catch (_) {}
 
             if (!name) {
-                const t = (l.innerText || '').trim();
-                const parts = t.split('\n').map(s => s.trim()).filter(Boolean);
-                for (let part of parts) {
-                    if (!name && isNaN(Number(part)) && !part.startsWith('$')) {
-                        name = part;
+                const nameEl  = l.querySelector('.product-name, .name, .product-title');
+                const priceEl = l.querySelector('.price, .product-price');
+                const qtyEl   = l.querySelector('.qty, .quantity');
+
+                if (nameEl) name = nameEl.innerText.trim();
+                if (priceEl && !price) price = parseFloat(priceEl.innerText.replace(/[^0-9.]/g, '')) || 0;
+                if (qtyEl && qty === 1) qty = parseFloat(qtyEl.innerText.replace(/[^0-9.]/g, '')) || 1;
+
+                if (!name) {
+                    const t = (l.innerText || '').trim();
+                    const parts = t.split('\n').map(s => s.trim()).filter(Boolean);
+                    for (let part of parts) {
+                        if (!name && isNaN(Number(part)) && !part.startsWith('$')) {
+                            name = part;
+                        }
                     }
+                    const priceM = t.match(/\$\s*([0-9.]+)/);
+                    if (priceM && !price) price = parseFloat(priceM[1]);
                 }
-                const priceM = t.match(/\$\s*([0-9.]+)/);
-                if (priceM && !price) price = parseFloat(priceM[1]);
             }
 
             if (name) {
-                const img = findProductImage(null, name);
-                items.push({ name, price, qty, line_total: price * qty, image: img || null });
+                name = cleanProductName(name, qty);
+                const img = findProductImage(prodId, name, qty);
+                items.push({
+                    name,
+                    price: Number(price) || 0,
+                    qty: Number(qty) || 1,
+                    line_total: (Number(price) || 0) * (Number(qty) || 1),
+                    image: img || null
+                });
             }
         });
 

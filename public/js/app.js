@@ -241,7 +241,14 @@
    */
   function cleanItemName(name) {
     if (!name) return "—";
-    return String(name).replace(/^\d+\s*[\r\n]+/, "").trim();
+    let s = String(name).replace(/^\d+\s*[\r\n]+/, "").trim();
+    if (/^\d(\d{3}-.*)/.test(s)) {
+      s = s.replace(/^\d(\d{3}-.*)/, "$1");
+    }
+    if (/^1([A-Z]\s+.*)/.test(s)) {
+      s = s.replace(/^1([A-Z]\s+.*)/, "$1");
+    }
+    return s;
   }
 
   /**
