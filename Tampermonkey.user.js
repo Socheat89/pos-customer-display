@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.8
+// @version      14.9
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -24,7 +24,6 @@
     // ── Persistent Cache across screen switches ────────────────
     let lastKey          = '';
     let lastScreenState  = '';
-    let isCurrentlyReset = false;
     let cachedItems      = [];
     let cachedTotal      = 0;
     let cachedRef        = '';
@@ -580,79 +579,141 @@
         } catch (_) {}
 
         // ──────────────────────────────────────────────────────────
-        // E. Receipt Screen → បង្ហាញផ្ទាំង SUCCESS (Payment Successful) រួច Reset
+        // ស្រង់ Order Reference / Tab ID (ឧ. 68002, 68003, POS-xxx)
         // ──────────────────────────────────────────────────────────
-        if (isReceipt) {
-            if (!isCurrentlyReset) {
-                isCurrentlyReset = true;
-                lastKey          = 'RECEIPT_DONE';
-                console.log('[POS Sync] ReceiptScreen → syncing SUCCESS to display');
-
-                // ផ្ញើ status SUCCESS ទៅកាន់ Customer Display ឱ្យចេញផ្ទាំង Thank You / Payment Success
-                GM_xmlhttpRequest({
-                    method: 'POST',
-                    url: VERCEL_API,
-                    headers: { 'Content-Type': 'application/json' },
-                    data: JSON.stringify({
-                        store_id:     STORE_ID,
-                        name:         cachedRef || 'POS-ORDER',
-                        reference:    cachedRef || 'POS-ORDER',
-                        amount_total: cachedTotal,
-                        currency:     currency,
-                        items:        cachedItems,
-                        show_qr:      false,
-                        status:       'SUCCESS'
-                    }),
-                    onload: function() {
-                        console.log('✅ [POS Sync] SUCCESS sent to Customer Display');
-                    },
-                    onerror: function(err) {
-                        console.error('❌ [POS Sync] Failed to send SUCCESS, fallback to reset:', err);
-                        GM_xmlhttpRequest({ method: 'GET', url: RESET_API });
+        function extractOrderRef(posObj) {
+            if (posObj) {
+                try {
+                    const ord = posObj.get_order?.() || posObj.selectedOrder;
+                    if (ord) {
+                        const ref = ord.get_name?.() || ord.name || ord.tracking_number || ord.sequence_number || ord.pos_reference;
+                        if (ref) return String(ref).trim();
                     }
-                });
+                } catch (_) {}
+            }
+            // ស្រង់ពី DOM Tab Bar ខាងលើ (ឧ. Tab "68003", "68002")
+            const activeTab = document.querySelector(
+                '.order-button.selected, .select-order.selected, .order-selector .selected, .ticket-button.active, .ticket-button.highlight, .pos-rightheader .order-button'
+            );
+            if (activeTab) {
+                const txt = (activeTab.innerText || activeTab.textContent || '').trim();
+                if (txt && !txt.includes('+') && !txt.toLowerCase().includes('order')) {
+                    return txt;
+                }
+            }
+            return '';
+        }
 
-                cachedItems      = [];
-                cachedTotal      = 0;
-                cachedRef        = '';
+        // ──────────────────────────────────────────────────────────
+        // បាញ់ SUCCESS ទៅ Vercel ពេល Payment រួចរាល់
+        // ──────────────────────────────────────────────────────────
+        function sendPaymentSuccess(ref, totalVal, itemsList, curr) {
+            if (lastKey === 'SUCCESS_SENT') return;
+            lastKey = 'SUCCESS_SENT';
+            console.log(`🎉 [POS Sync] Payment SUCCESS for ${ref || 'ORDER'} ($${totalVal}) → syncing to Customer Display`);
+
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: VERCEL_API,
+                headers: { 'Content-Type': 'application/json' },
+                data: JSON.stringify({
+                    store_id:     STORE_ID,
+                    name:         ref || 'POS-ORDER',
+                    reference:    ref || 'POS-ORDER',
+                    amount_total: Number(totalVal) || 0,
+                    currency:     curr || 'USD',
+                    items:        Array.isArray(itemsList) ? itemsList : [],
+                    show_qr:      false,
+                    status:       'SUCCESS'
+                }),
+                onload: function(res) {
+                    console.log('✅ [POS Sync] SUCCESS sent successfully (HTTP ' + res.status + ')');
+                },
+                onerror: function(err) {
+                    console.error('❌ [POS Sync] Failed to send SUCCESS:', err);
+                }
+            });
+
+            // សម្អាត Cache ចោលទាំងអស់ដើម្បីកុំឱ្យ Order ចាស់មកវិញ
+            cachedItems = [];
+            cachedTotal = 0;
+            cachedRef   = '';
+        }
+
+        // ──────────────────────────────────────────────────────────
+        // E. ពិនិត្យថា Order ត្រូវបាន Validate ឬ Paid រួចរាល់
+        // ──────────────────────────────────────────────────────────
+        const currentOrder = pos?.get_order?.();
+        const isOrderFinalized = Boolean(
+            isReceipt ||
+            (currentOrder && (
+                currentOrder.finalized === true ||
+                currentOrder.state === 'paid' ||
+                currentOrder.state === 'done' ||
+                (typeof currentOrder.is_paid === 'function' && currentOrder.is_paid())
+            ))
+        );
+
+        if (isOrderFinalized) {
+            if (lastKey !== 'SUCCESS_SENT') {
+                const finalRef   = extractOrderRef(pos) || cachedRef || 'POS-ORDER';
+                const finalTotal = cachedTotal || extractTotal(pos);
+                const finalItems = cachedItems.length ? cachedItems : extractItems(pos);
+                sendPaymentSuccess(finalRef, finalTotal, finalItems, currency);
             }
             return;
         }
 
         // ──────────────────────────────────────────────────────────
-        // F. ស្រង់ Items & Total
+        // F. ស្រង់ Items, Total & Order Ref
         // ──────────────────────────────────────────────────────────
         let total = extractTotal(pos);
         let items = extractItems(pos);
+        const currentRef = extractOrderRef(pos);
+
+        // ប្រសិនបើដូរ Order Tab (ឧ. ពី 68002 ទៅ 68003) -> សម្អាត Cache ចាស់ចោលភ្លាម
+        if (currentRef && cachedRef && currentRef !== cachedRef) {
+            console.log(`[POS Sync] New order detected: ${currentRef} (was ${cachedRef}) -> clearing cache`);
+            cachedItems = [];
+            cachedTotal = 0;
+            cachedRef   = currentRef;
+            lastKey     = '';
+        }
+        if (currentRef) cachedRef = currentRef;
 
         // ──────────────────────────────────────────────────────────
-        // G+H. Cache + Empty check (combined, correct order)
-        // ក័១សែជំស្ត័នត្រូវបែ: យក Cache មុននឹកុន Reset ប័យប្រសិនបើលើ នៅលើ PaymentScreen
+        // G. Cart Empty handling (ផ្ទាំង Register / ProductScreen)
         // ──────────────────────────────────────────────────────────
-        if (items.length === 0) {
-            if (isPayment && cachedItems.length > 0) {
-                // PaymentScreen: Odoo លាកន្រួស orderlines របស់ នឹងយកអ្វី Cache
+        if (!isPayment && items.length === 0) {
+            // Cart ទទេលើ ProductScreen (ឧ. Order ថ្មី 68003 ឬ Cancelled)
+            cachedItems = [];
+            cachedTotal = 0;
+            total       = 0;
+
+            if (lastKey !== 'RESET_IDLE') {
+                lastKey = 'RESET_IDLE';
+                console.log('[POS Sync] ProductScreen cart is empty → calling RESET to IDLE');
+                GM_xmlhttpRequest({
+                    method: 'GET',
+                    url: RESET_API,
+                    onload: function() {
+                        console.log('✅ [POS Sync] Display reset to Welcome screen (IDLE)');
+                    }
+                });
+            }
+            return;
+        }
+
+        // ប្រសិនបើនៅលើ PaymentScreen តែ Odoo លាក់ lines ក្នុង DOM -> ប្រើ Cache
+        if (isPayment && items.length === 0) {
+            if (cachedItems.length > 0) {
                 items = cachedItems;
                 if (total === 0) total = cachedTotal;
-                console.debug(`[POS Sync] PaymentScreen: items hidden by Odoo, using cache(${items.length}) total=$${ total}`);
             } else {
-                // កំពុងអ្វីទាកស្ក័ត: ជំរាកត្រូវ Cancel ឬ្រតែត្រន់ Cart ទឹ
-                cachedItems = [];
-                cachedTotal = 0;
-                cachedRef   = '';
-                total       = 0;
-
-                if (!isCurrentlyReset) {
-                    isCurrentlyReset = true;
-                    lastKey = '';
-                    console.log('[POS Sync] Cart empty / Order cancelled → calling RESET');
-                    GM_xmlhttpRequest({ method: 'GET', url: RESET_API });
-                }
                 return;
             }
         }
 
-        // ស្ទុកក័សែ Items មាន ញ Cache អ័បឋែតែឡ
         if (items.length > 0) {
             cachedItems = items;
         }
@@ -663,12 +724,12 @@
         }
         if (total > 0) cachedTotal = total;
 
-        // បើគ្មានត្រនឹទាកស្រុង Reset ត្រន់ប់ IDLE
+        // បើគ្មានទំនិញទាំងស្រុង ត្រូវ Reset ត្រឡប់ទៅ IDLE ភ្លាម
         if (items.length === 0 || total === 0) {
-            cachedItems = []; cachedTotal = 0; cachedRef = '';
-            if (!isCurrentlyReset) {
-                isCurrentlyReset = true;
-                lastKey = '';
+            cachedItems = [];
+            cachedTotal = 0;
+            if (lastKey !== 'RESET_IDLE') {
+                lastKey = 'RESET_IDLE';
                 console.log('[POS Sync] No items or total 0 → calling RESET');
                 GM_xmlhttpRequest({ method: 'GET', url: RESET_API });
             }
@@ -676,39 +737,15 @@
         }
 
         // ──────────────────────────────────────────────────────────
-        // I. Order Reference
-        // ──────────────────────────────────────────────────────────
-        let orderRef = '';
-        try {
-            if (pos) {
-                const order = pos.get_order?.();
-                if (order) orderRef = order.get_name?.() || order.name || '';
-            }
-        } catch (_) {}
-
-        if (!orderRef) {
-            if (!cachedRef) cachedRef = 'POS-' + Math.floor(1000 + Math.random() * 9000);
-            orderRef = cachedRef;
-        } else {
-            if (cachedRef && cachedRef !== orderRef) {
-                console.log(`[POS Sync] New order detected: ${orderRef} (was ${cachedRef}) -> resetting cache`);
-                cachedItems = [];
-                cachedTotal = 0;
-                lastKey = '';
-            }
-            cachedRef = orderRef;
-        }
-
-        // ──────────────────────────────────────────────────────────
-        // J. Sync ទៅ Vercel តែប្រសិនបើ Key ផ្លាស់ប្ដូរ
+        // H. Sync ទៅ Vercel តែប្រសិនបើ Key ផ្លាស់ប្ដូរ
         // ──────────────────────────────────────────────────────────
         const showQR   = isPayment;
         const itemsKey = items.map(i => `${i.name}_${i.qty}_${i.price}_${i.image ? '1' : '0'}`).join('|');
+        const orderRef = currentRef || cachedRef || 'POS-' + Math.floor(1000 + Math.random() * 9000);
         const key      = `${STORE_ID}|${total}|${showQR}|${itemsKey}|${orderRef}|${currency}`;
 
         if (total > 0 && key !== lastKey) {
-            lastKey          = key;
-            isCurrentlyReset = false;
+            lastKey = key;
 
             const payload = {
                 store_id:     STORE_ID,
@@ -721,7 +758,7 @@
                 status:       'ACTIVE'
             };
 
-            console.log(`⚡ [POS→Vercel] store=${STORE_ID} showQR=${showQR} total=$${total} items=${items.length} curr=${currency}`);
+            console.log(`⚡ [POS→Vercel] store=${STORE_ID} showQR=${showQR} total=$${total} items=${items.length} curr=${currency} ref=${orderRef}`);
             GM_xmlhttpRequest({
                 method: 'POST',
                 url: VERCEL_API,
@@ -750,7 +787,25 @@
     setInterval(checkPOS, 250);
 
     // ចាប់ Event Click ដើម្បី Sync ភ្លាមៗ (ចុច Payment, Validate, etc.)
-    document.addEventListener('click', function() {
+    document.addEventListener('click', function(e) {
+        const target = e.target;
+        const btn = target?.closest?.('button.validate, .button.validate, button.validation, .payment-screen button.next, button.highlight, .pay-circle, [class*="validate"]');
+        const txt = (target?.innerText || target?.textContent || '').trim().toLowerCase();
+
+        // ប្រសិនបើចុចលើប៊ូតុង Validate ត្រូវកត់ត្រាថា Payment រួចរាល់ភ្លាម
+        if (btn || txt === 'validate' || txt.includes('validate')) {
+            console.log('🖱️ [POS Sync] Validate button clicked → syncing SUCCESS');
+            try {
+                const pos = getOdooPos();
+                const ord = pos?.get_order?.();
+                const ref = ord?.get_name?.() || ord?.name || cachedRef || 'POS-ORDER';
+                const tot = cachedTotal || extractTotal(pos);
+                const its = cachedItems.length ? cachedItems : extractItems(pos);
+                const cur = pos?.currency?.name || pos?.company_currency?.name || 'USD';
+                sendPaymentSuccess(ref, tot, its, cur);
+            } catch (_) {}
+        }
+
         setTimeout(checkPOS, 30);
         setTimeout(checkPOS, 200);
         setTimeout(checkPOS, 500);
