@@ -41,11 +41,20 @@ async function checkPaywayTransaction(tranId) {
 
     if (res.ok) {
       const data = await res.json();
-      const code = String(data?.status?.code ?? data?.status ?? '');
-      const paymentStatus = String(data?.payment_status ?? '').toUpperCase();
-      // Code 00 or 0 or PAID or SUCCESS means customer successfully paid!
-      if (code === '00' || code === '0' || paymentStatus === 'PAID' || paymentStatus === 'SUCCESS') {
-        console.log(`[status:payway-poll] Transaction confirmed PAID for tran_id=${tranId}`);
+      console.log(`[status:payway-poll] tran_id=${tranId} raw response:`, JSON.stringify(data));
+      // NOTE: In PayWay check-transaction-2:
+      // data.status is the API call status (code "0" means API request succeeded).
+      // The actual payment status is in data.data.payment_status or data.payment_status!
+      const pStatus = String(data?.data?.payment_status ?? data?.payment_status ?? '').toUpperCase();
+      const pStatusCode = data?.data?.payment_status_code ?? data?.payment_status_code;
+
+      // Strictly confirm payment: only if explicitly APPROVED, PAID, or SUCCESS
+      if (pStatus === 'APPROVED' || pStatus === 'PAID' || pStatus === 'SUCCESS') {
+        console.log(`[status:payway-poll] Transaction confirmed PAID for tran_id=${tranId} (status=${pStatus})`);
+        return true;
+      }
+      if (pStatusCode === 0 && (pStatus === 'APPROVED' || pStatus === 'COMPLETED' || pStatus === 'PAID')) {
+        console.log(`[status:payway-poll] Transaction confirmed PAID for tran_id=${tranId} (code=0 status=${pStatus})`);
         return true;
       }
     }
@@ -107,8 +116,8 @@ export default async function handler(req, res) {
 
     const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
 
-    // Auto-check ABA PayWay if session is currently waiting for payment
-    if (data && (data.status === 'ACTIVE' || data.status === 'PENDING') && (data.tran_id || data.reference)) {
+    // Auto-check ABA PayWay ONLY if session is currently waiting for payment AND QR is shown to customer
+    if (data && data.show_qr && (data.status === 'ACTIVE' || data.status === 'PENDING') && (data.tran_id || data.reference)) {
       const tranIdToCheck = data.tran_id || data.reference;
       const cooldownKey = `payway_poll_cd_${tranIdToCheck}`;
       try {
