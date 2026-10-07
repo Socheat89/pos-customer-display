@@ -433,10 +433,10 @@
     const t3Card       = document.querySelector(".t3-card");
     const t3Caption    = document.querySelector(".t3-caption");
 
-    const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true || Boolean(data.qr_string || data.qr_image);
+    const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true;
 
     if (khqrModal) {
-      if (showQR) {
+      if (showQR && (data.qr_image || data.qr_string)) {
         // Prioritize official Base64 pre-rendered image from ABA PayWay
         if (data.qr_image) {
           const rawImg = data.qr_image;
@@ -567,6 +567,7 @@
             items: itemsList,
             show_qr: showQR,
             qr: data.qr_string || '',
+            qr_img: data.qr_image ? data.qr_image.slice(0, 50) : '',
             updated: data.updated_at || 0
           });
 
