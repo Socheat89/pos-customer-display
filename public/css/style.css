@@ -423,8 +423,10 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* Light, semi-transparent — no blur so background is fully visible */
-  background: rgba(203, 213, 225, 0.45);
+  /* Dark semi-transparent backdrop overlay */
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   padding: 16px;
   transition: opacity 0.3s ease, visibility 0.3s ease;
   opacity: 1;
@@ -441,24 +443,22 @@ html, body {
    OFFICIAL ABA PAYWAY template3_color SPECIFICATION
    ========================================================= */
 
-/* Template 3 Popup Wrapper — with ABA KHQR protected outline (no red border) */
+/* Template 3 Popup Wrapper — clean light gray rounded container box */
 .t3-modal-wrapper {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-  max-width: 276px;
+  max-width: 330px;
   animation: t3Popup 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
 
-  /* Protected outline: clean white card wrap with subtle shadow only */
+  /* Clean solid light gray card container background matching standard ABA modal */
   border-radius: 28px;
-  padding: 14px;
-  background: linear-gradient(160deg, #f0f4f8 0%, #e2e8f0 100%);
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.22),     /* Elevation shadow            */
-    inset 0 1px 0 rgba(255,255,255,0.85); /* Inner top highlight         */
+  padding: 24px 22px 24px;
+  background: #E8EBEF;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
 }
 
 @keyframes t3Popup {
@@ -472,29 +472,20 @@ html, body {
   }
 }
 
-
-
-/* Official ABA' PAY Wordmarks Centered Above Ticket */
+/* ABA' PAY Logo Centered Above Ticket */
 .t3-brand-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  gap: 7px;
-  margin-bottom: 14px;
-  background: #FFFFFF;
-  padding: 6px 18px 7px;
-  border-radius: 9999px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  margin-bottom: 22px;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.t3-brand-header img.t3-wm1 {
-  height: 28px;
-  width: auto;
-  display: block;
-}
-
-.t3-brand-header img.t3-wm2 {
-  height: 24px;
+.t3-aba-pay-logo {
+  height: 32px;
   width: auto;
   display: block;
 }
@@ -521,22 +512,22 @@ html, body {
   width: 100%;
   background: #FFFFFF;
   border-radius: 20px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
 }
 
-/* Official Red Ribbon Banner with Signature Chamfer Cut & Centered KHQR Logo */
+/* Red Ribbon Banner with Signature Chamfer Cut & Centered KHQR Logo */
 .t3-banner {
   position: relative;
   width: 100%;
   height: 52px;
   background: #E1251B;
   /* Official diagonal chamfer cut on bottom-right corner */
-  clip-path: polygon(0 0, 100% 0, 100% 48%, 84% 100%, 0 100%);
-  -webkit-clip-path: polygon(0 0, 100% 0, 100% 48%, 84% 100%, 0 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 85% 100%, 0 100%);
+  -webkit-clip-path: polygon(0 0, 100% 0, 100% 55%, 85% 100%, 0 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -548,9 +539,9 @@ html, body {
   display: block;
 }
 
-/* Merchant Info: Left-aligned to match QR Code */
+/* Merchant Info: Left-aligned */
 .t3-merchant-box {
-  padding: 16px 20px 0;
+  padding: 20px 24px 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -559,16 +550,16 @@ html, body {
 }
 
 .t3-merchant-name {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   color: #374151;
-  margin: 0 0 2px 0;
+  margin: 0 0 4px 0;
   letter-spacing: -0.01em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .t3-amount {
-  font-size: 25px;
+  font-size: 28px;
   font-weight: 800;
   color: #111827;
   margin: 0;
@@ -578,8 +569,8 @@ html, body {
 
 /* Dashed divider line across ticket */
 .t3-dashed-divider {
-  width: calc(100% - 40px);
-  margin: 12px 20px 14px;
+  width: calc(100% - 48px);
+  margin: 14px 24px 18px;
   border-top: 1.5px dashed #D1D5DB;
 }
 
@@ -588,7 +579,7 @@ html, body {
   position: relative;
   width: 216px;
   height: 216px;
-  margin: 0 auto 20px;
+  margin: 0 auto 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -632,19 +623,19 @@ html, body {
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.25));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.18));
   z-index: 5;
 }
 
 /* Official footer caption below ticket */
 .t3-caption {
   text-align: center;
-  color: #475569;  /* Darker caption text — readable on light overlay */
+  color: #64748B;
   font-size: 13px;
   font-weight: 500;
-  margin: 14px 0 0;
-  padding: 0 4px;
-  line-height: 1.45;
+  margin: 18px 0 0;
+  padding: 0 8px;
+  line-height: 1.4;
   max-width: 260px;
 }
 

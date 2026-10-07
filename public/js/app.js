@@ -359,7 +359,7 @@
     }
     const merchantEl = document.getElementById("khqr_merchant_name") || document.getElementById("khqr-ticket-merchant");
     if (merchantEl) {
-      merchantEl.textContent = data.merchant_name || "SK STORE";
+      merchantEl.textContent = data.merchant_name || "Coffee Khlaing";
     }
 
     // Toggle ABA KHQR Modal Overlay visibility based on show_qr flag
