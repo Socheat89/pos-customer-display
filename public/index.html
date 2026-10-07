@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="/css/style.css?v=20261007_08" />
+  <link rel="stylesheet" href="/css/style.css?v=20261007_12" />
 
   <!-- qrcode-generator: robust full-version QR code engine for long KHQR strings -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" crossorigin="anonymous"></script>
@@ -178,50 +178,67 @@
        ╚══════════════════════════════════════════════════════╝ -->
   <section id="screen-success" class="hidden" aria-label="Payment successful" aria-live="assertive">
 
+    <!-- Ambient luminous emerald background aura -->
+    <div class="success-ambient-glow" aria-hidden="true"></div>
+
+    <!-- Celebration floating sparkle particles -->
+    <div class="success-particles" aria-hidden="true">
+      <span class="particle-sparkle sp-1">✦</span>
+      <span class="particle-sparkle sp-2">✦</span>
+      <span class="particle-sparkle sp-3">✦</span>
+      <span class="particle-sparkle sp-4">✦</span>
+      <span class="particle-sparkle sp-5">✦</span>
+      <span class="particle-sparkle sp-6">✦</span>
+    </div>
+
+    <!-- Frosted Luxury Glassmorphism Card -->
     <div class="success-card" role="status">
 
-      <!-- Animated green checkmark ring -->
-      <div class="success-icon-ring" aria-hidden="true">
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M20 6L9 17l-5-5" />
-        </svg>
+      <!-- Animated multi-layered radiant checkmark emblem -->
+      <div class="success-icon-wrapper" aria-hidden="true">
+        <div class="success-ripple ripple-1"></div>
+        <div class="success-ripple ripple-2"></div>
+        <div class="success-icon-ring">
+          <svg class="success-check-svg" viewBox="0 0 52 52" fill="none">
+            <path class="success-check-path" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" d="M14 27l8 8 16-16" />
+          </svg>
+        </div>
       </div>
 
-      <!-- "Payment Successful!" — above "Thank You!" per reviewer requirement -->
-      <p class="success-payment-label" id="success-payment-label">
-        Payment Successful!
-      </p>
+      <!-- Luminous status pill badge -->
+      <div class="success-badge success-payment-label" id="success-payment-label">
+        <svg viewBox="0 0 20 20" fill="currentColor" class="badge-icon">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <span class="badge-text">ការទូទាត់ជោគជ័យ • Payment Successful!</span>
+      </div>
 
       <!-- Main celebration heading -->
       <h2 class="success-title">Thank You!</h2>
+      <p class="success-khmer-sub">សូមអរគុណសម្រាប់ការទិញទំនិញ</p>
 
       <!-- Subtitle -->
       <p class="success-subtitle">
-        Your payment has been received.<br/>
-        Please collect your receipt.
+        Your payment has been received successfully.<br/>
+        Please collect your receipt & goods.
       </p>
 
-      <!-- Auto-reset countdown -->
+      <!-- Auto-reset countdown capsule -->
       <div class="success-countdown" aria-live="polite">
-        <span class="countdown-dot" aria-hidden="true"></span>
-        <span id="countdown-text">Returning in 5s…</span>
+        <span class="countdown-pulse-ring" aria-hidden="true">
+          <span class="countdown-dot"></span>
+        </span>
+        <span id="countdown-text">Returning in 4s…</span>
       </div>
 
-    </div>
+    </div><!-- /success-card -->
 
   </section><!-- /screen-success -->
 
 </div><!-- /#app -->
 
 <!-- Client logic — cache-busted on every deploy via ?v= timestamp -->
-<script src="/js/app.js?v=20261007_11"></script>
+<script src="/js/app.js?v=20261007_12"></script>
 
 </body>
 </html>
