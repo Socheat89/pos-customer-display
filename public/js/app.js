@@ -95,6 +95,28 @@
     });
   }
 
+  // ── EMVCo / KHQR Parser ─────────────────────────────────────
+
+  /**
+   * Parses EMVCo / KHQR TLV (Tag-Length-Value) string into a dictionary.
+   * Format: ID(2 chars) + Length(2 chars) + Value(len chars)
+   * @param {string|null} str
+   * @returns {Record<string, string>}
+   */
+  function parseEMVCo(str) {
+    const tags = {};
+    if (!str || typeof str !== "string") return tags;
+    let i = 0;
+    while (i < str.length - 4) {
+      const id = str.substring(i, i + 2);
+      const len = parseInt(str.substring(i + 2, i + 4), 10);
+      if (isNaN(len) || i + 4 + len > str.length) break;
+      tags[id] = str.substring(i + 4, i + 4 + len);
+      i += 4 + len;
+    }
+    return tags;
+  }
+
   // ── QR Code Rendering ────────────────────────────────────────
 
   /**
@@ -131,8 +153,8 @@
       img.src = qrString;
       img.alt = "ABA KHQR Payment Code";
       img.className = "pw-khqr-qr-image";
-      img.style.width = "190px";
-      img.style.height = "190px";
+      img.style.width = "154px";
+      img.style.height = "154px";
       img.onerror = () => {
         container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
       };
@@ -143,42 +165,67 @@
     // Show center badge for dynamic QR
     if (centerBadge) centerBadge.style.display = "block";
 
-    // 1. Primary: Try qrcode.js with CorrectLevel.M for KHQR compliance & center logo protection
-    try {
-      new QRCode(container, {
-        text:           qrString,
-        width:          190,
-        height:         190,
-        colorDark:      "#000000",
-        colorLight:     "#ffffff",
-        correctLevel:   QRCode.CorrectLevel.M,
-      });
-      return;
-    } catch (err) {
-      console.warn("[QR] qrcode.js overflow with level M, trying Level L:", err);
-      container.innerHTML = "";
+    // 1. Primary: Use qrcode-generator (robust, supports all QR versions up to 40, zero overflow)
+    if (typeof qrcode === "function") {
       try {
-        new QRCode(container, {
-          text:           qrString,
-          width:          190,
-          height:         190,
-          colorDark:      "#000000",
-          colorLight:     "#ffffff",
-          correctLevel:   QRCode.CorrectLevel.L,
-        });
+        const qr = qrcode(0, "M");
+        qr.addData(qrString);
+        qr.make();
+        const cell = 154 / qr.getModuleCount();
+        const svgTag = qr.createSvgTag(cell, 0);
+        container.innerHTML = svgTag;
+        const svgEl = container.querySelector("svg");
+        if (svgEl) {
+          svgEl.setAttribute("width", "154");
+          svgEl.setAttribute("height", "154");
+          svgEl.style.width = "154px";
+          svgEl.style.height = "154px";
+          svgEl.style.display = "block";
+        }
         return;
-      } catch (err2) {
-        console.warn("[QR] qrcode.js fallback error:", err2);
+      } catch (errQ) {
+        console.warn("[QR] qrcode-generator error:", errQ);
       }
     }
 
-    // 2. Secondary: High-reliability QR Image endpoint fallback
+    // 2. Secondary: Try qrcode.js with CorrectLevel.M or Level L
+    if (typeof QRCode === "function") {
+      try {
+        new QRCode(container, {
+          text:           qrString,
+          width:          154,
+          height:         154,
+          colorDark:      "#000000",
+          colorLight:     "#ffffff",
+          correctLevel:   QRCode.CorrectLevel.M,
+        });
+        return;
+      } catch (err) {
+        console.warn("[QR] qrcode.js overflow with level M, trying Level L:", err);
+        container.innerHTML = "";
+        try {
+          new QRCode(container, {
+            text:           qrString,
+            width:          154,
+            height:         154,
+            colorDark:      "#000000",
+            colorLight:     "#ffffff",
+            correctLevel:   QRCode.CorrectLevel.L,
+          });
+          return;
+        } catch (err2) {
+          console.warn("[QR] qrcode.js fallback error:", err2);
+        }
+      }
+    }
+
+    // 3. Fallback: High-reliability QR Image endpoint
     const img = document.createElement("img");
-    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=190x190&data=${encodeURIComponent(qrString)}`;
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=154x154&data=${encodeURIComponent(qrString)}`;
     img.alt = "ABA KHQR Payment Code";
     img.className = "pw-khqr-qr-image";
-    img.style.width = "190px";
-    img.style.height = "190px";
+    img.style.width = "154px";
+    img.style.height = "154px";
     img.onerror = () => {
       container.innerHTML = `<div class="qr-placeholder"><p>QR unavailable</p></div>`;
     };
@@ -343,11 +390,21 @@
       els.totalCurrency.textContent = '';
     }
 
-    // Update ABA KHQR Modal Card fields (Official template3_color specification)
-    const isKHR = (data.currency || "USD").toUpperCase() === "KHR";
+    // Parse EMVCo / KHQR payload tags if available
+    const emvTags = data.qr_string ? parseEMVCo(data.qr_string) : {};
+
+    // Determine currency: data.currency or Tag 53 ('116'=KHR, '840'=USD)
+    const rawCurrency = data.currency || (emvTags["53"] === "116" ? "KHR" : "USD");
+    const isKHR = rawCurrency.toUpperCase() === "KHR";
+
+    // Determine amount: data.amount_total or Tag 54
+    const totalVal = data.amount_total !== undefined && data.amount_total !== null
+      ? Number(data.amount_total)
+      : (emvTags["54"] ? Number(emvTags["54"]) : 0);
+
     const formattedKhqrAmt = isKHR
-      ? Number(data.amount_total || 0).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-      : formatAmount(data.amount_total || 0);
+      ? totalVal.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+      : formatAmount(totalVal);
 
     const khqrAmountEl = document.getElementById("khqr_amount") || els.amountValue;
     if (khqrAmountEl) {
@@ -358,14 +415,17 @@
       }
     }
     if (els.amountCurrency) {
-      els.amountCurrency.textContent = (data.currency || "USD").toUpperCase();
-    }
-    const merchantEl = document.getElementById("khqr_merchant_name") || document.getElementById("khqr-ticket-merchant");
-    if (merchantEl) {
-      merchantEl.textContent = data.merchant_name || data.name || "SO CHEAT Official";
+      els.amountCurrency.textContent = rawCurrency.toUpperCase();
     }
 
-    // Toggle ABA KHQR Modal Overlay visibility based on show_qr flag
+    // Extract merchant name (prioritize data.merchant_name, then EMVCo Tag 59)
+    const merchantName = data.merchant_name || emvTags["59"] || "SO CHEAT Official";
+    const merchantEl = document.getElementById("khqr_merchant_name") || document.getElementById("khqr-ticket-merchant");
+    if (merchantEl) {
+      merchantEl.textContent = merchantName;
+    }
+
+    // Toggle ABA KHQR Modal Overlay visibility based on show_qr flag or QR availability
     const khqrModal    = document.getElementById("khqr-modal-overlay");
     const modalWrapper = document.querySelector(".t3-modal-wrapper");
     const officialImg  = document.getElementById("t3-official-image");
@@ -373,7 +433,7 @@
     const t3Card       = document.querySelector(".t3-card");
     const t3Caption    = document.querySelector(".t3-caption");
 
-    const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true;
+    const showQR = data.show_qr === true || data.is_payment === true || data.payment_mode === true || Boolean(data.qr_string || data.qr_image);
 
     if (khqrModal) {
       if (showQR) {

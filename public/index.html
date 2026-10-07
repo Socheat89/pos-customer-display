@@ -23,19 +23,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="/css/style.css?v=20261007_05" />
+  <link rel="stylesheet" href="/css/style.css?v=20261007_07" />
 
-  <!-- qrcode.js — lightweight QR renderer (integrity hash removed to prevent SRI mismatch block) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <!-- Fallback: jsDelivr CDN if cloudflare fails -->
+  <!-- qrcode-generator: robust full-version QR code engine for long KHQR strings -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" crossorigin="anonymous"></script>
   <script>
-    if (typeof QRCode === 'undefined') {
-      var s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
-      document.head.appendChild(s);
+    if (typeof qrcode === 'undefined') {
+      var s2 = document.createElement('script');
+      s2.src = 'https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';
+      document.head.appendChild(s2);
     }
   </script>
+
+  <!-- qrcode.js fallback -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 
 <body>
@@ -219,7 +221,7 @@
 </div><!-- /#app -->
 
 <!-- Client logic — cache-busted on every deploy via ?v= timestamp -->
-<script src="/js/app.js?v=20261007_05"></script>
+<script src="/js/app.js?v=20261007_07"></script>
 
 </body>
 </html>

@@ -451,23 +451,23 @@ html, body {
   align-items: center;
   justify-content: center;
   width: 90%;
-  max-width: 380px;
+  max-width: 386px;
   animation: t3Popup 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
 
   /* Clean solid light neutral gray squarcle card container matching reference */
-  border-radius: 28px;
-  padding: 30px 66px 26px;
-  background: #E8EBEF;
+  border-radius: 26px;
+  padding: 26px 85px 22px;
+  background: #E8E9EC;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
 /* When showing direct pre-rendered ABA PayWay official Base64 image, keep matching wrapper */
 .t3-modal-wrapper.t3-wrapper-raw-image {
-  padding: 30px 66px 26px !important;
-  max-width: 380px !important;
-  background: #E8EBEF !important;
-  border-radius: 28px !important;
+  padding: 26px 85px 22px !important;
+  max-width: 386px !important;
+  background: #E8E9EC !important;
+  border-radius: 26px !important;
 }
 
 @keyframes t3Popup {
@@ -486,7 +486,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
   background: transparent;
   padding: 0;
   border-radius: 0;
@@ -494,20 +494,20 @@ html, body {
 }
 
 .t3-aba-pay-logo {
-  height: 32px;
+  height: 28px;
   width: auto;
   display: block;
 }
 
 /* Official PayWay Pre-rendered template3_color Base64 Image */
 .t3-official-image {
-  max-width: 248px;
+  max-width: 206px;
   width: 100%;
   height: auto;
-  border-radius: 20px;
+  border-radius: 18px;
   display: block;
   margin: 0 auto;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   animation: modalPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -519,10 +519,10 @@ html, body {
 .t3-card {
   position: relative;
   width: 100%;
-  max-width: 248px;
+  max-width: 206px;
   background: #FFFFFF;
-  border-radius: 20px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -533,7 +533,7 @@ html, body {
 .t3-banner {
   position: relative;
   width: 100%;
-  height: 46px;
+  height: 40px;
   background: #E1251B;
   /* Official diagonal chamfer cut on bottom-right corner */
   clip-path: polygon(0 0, 100% 0, 100% 55%, 85% 100%, 0 100%);
@@ -544,14 +544,14 @@ html, body {
 }
 
 .t3-khqr-logo {
-  height: 16px;
+  height: 14px;
   width: auto;
   display: block;
 }
 
 /* Merchant Info: Left-aligned */
 .t3-merchant-box {
-  padding: 12px 18px 0;
+  padding: 10px 14px 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -560,16 +560,20 @@ html, body {
 }
 
 .t3-merchant-name {
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 500;
   color: #374151;
   margin: 0 0 2px 0;
   letter-spacing: -0.01em;
   text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .t3-amount {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   color: #111827;
   margin: 0;
@@ -579,25 +583,25 @@ html, body {
 
 /* Dashed divider line across ticket */
 .t3-dashed-divider {
-  width: calc(100% - 36px);
-  margin: 10px 18px 12px;
+  width: calc(100% - 28px);
+  margin: 8px 14px 10px;
   border-top: 1.5px dashed #D8DCE0;
 }
 
 /* QR Code Box — Exact Square */
 .t3-qr-wrap {
   position: relative;
-  width: 180px;
-  height: 180px;
-  margin: 0 auto 16px;
+  width: 154px;
+  height: 154px;
+  margin: 0 auto 12px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .t3-qr-container {
-  width: 180px;
-  height: 180px;
+  width: 154px;
+  height: 154px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -607,9 +611,10 @@ html, body {
 
 .t3-qr-container canvas,
 .t3-qr-container img,
+.t3-qr-container svg,
 .pw-khqr-qr-image {
-  width: 180px !important;
-  height: 180px !important;
+  width: 154px !important;
+  height: 154px !important;
   display: block;
   border-radius: 4px;
 }
@@ -628,8 +633,8 @@ html, body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -641,12 +646,12 @@ html, body {
 .t3-caption {
   text-align: center;
   color: #7E8B9B;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 500;
-  margin: 18px 0 0;
+  margin: 14px 0 0;
   padding: 0 4px;
-  line-height: 1.4;
-  max-width: 220px;
+  line-height: 1.35;
+  max-width: 200px;
 }
 
 /* =========================================================
