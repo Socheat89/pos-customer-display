@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.13
+// @version      14.14
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -319,17 +319,46 @@
             return imageCache[`name:${lowerName}`];
         }
 
-        // 1. Try from Odoo POS DB
+        // 1. Try from Odoo POS DB & Odoo 18 Models
         try {
             const pos = getOdooPos();
             if (pos) {
-                const prod = (pos.db?.get_product_by_id?.(productId)) ||
-                             (pos.db?.product_by_id?.[productId]) ||
-                             (pos.models?.['product.product']?.get?.(productId));
-                if (prod?.image_128 && prod.image_128.length > 30) {
-                    const src = prod.image_128.startsWith('data:') ? prod.image_128 : `data:image/png;base64,${prod.image_128}`;
-                    imageCache[cacheKey] = src;
-                    return src;
+                // By numeric or string productId
+                if (productId && (typeof productId === 'number' || typeof productId === 'string')) {
+                    const prod = (pos.db?.get_product_by_id?.(productId)) ||
+                                 (pos.db?.product_by_id?.[productId]) ||
+                                 (pos.models?.['product.product']?.get?.(productId));
+                    const imgData = prod?.image_128 || prod?.image_256 || prod?.image_512;
+                    if (imgData && imgData.length > 30) {
+                        const src = imgData.startsWith('data:') ? imgData : `data:image/png;base64,${imgData}`;
+                        imageCache[cacheKey] = src;
+                        imageCache[`id:${productId}`] = src;
+                        return src;
+                    }
+                }
+
+                // By productName search in pos.models or pos.db
+                if (lowerName && lowerName !== 'item') {
+                    const allProds = pos.models?.['product.product']?.getAll?.() ||
+                                     pos.models?.['product.product']?.records ||
+                                     (pos.db?.product_by_id ? Object.values(pos.db.product_by_id) : []);
+                    for (const p of allProds) {
+                        const pName = (p.display_name || p.name || '').toLowerCase();
+                        if (pName && (pName === lowerName || pName.includes(lowerName) || lowerName.includes(pName))) {
+                            const imgData = p.image_128 || p.image_256 || p.image_512;
+                            if (imgData && imgData.length > 30) {
+                                const src = imgData.startsWith('data:') ? imgData : `data:image/png;base64,${imgData}`;
+                                imageCache[cacheKey] = src;
+                                if (p.id) imageCache[`id:${p.id}`] = src;
+                                imageCache[`name:${lowerName}`] = src;
+                                return src;
+                            }
+                            if (p.id && !productId) {
+                                productId = p.id;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         } catch (_) {}
@@ -342,7 +371,7 @@
             const cardName = (nameEl ? nameEl.innerText : c.innerText || '').trim().toLowerCase();
 
             const matchId = productId && String(cardId) === String(productId);
-            const matchName = lowerName && cardName && (cardName === lowerName || cardName.includes(lowerName) || lowerName.includes(cardName));
+            const matchName = lowerName && lowerName !== 'item' && cardName && (cardName === lowerName || cardName.includes(lowerName) || lowerName.includes(cardName));
 
             if (matchId || matchName) {
                 const img = c.querySelector('img');
@@ -375,13 +404,14 @@
             }
         }
 
-        // 3. Fallback: Request direct Odoo web/image as Base64 by productId
-        if (productId) {
-            const url = `${window.location.origin}/web/image?model=product.product&id=${productId}&field=image_128`;
+        // 3. Fallback: Request direct Odoo web/image as Base64 by numeric productId
+        const numId = Number(productId);
+        if (numId && !isNaN(numId) && numId > 0) {
+            const url = `${window.location.origin}/web/image?model=product.product&id=${numId}&field=image_128`;
             fetchImageAsBase64(url, (resB64) => {
                 if (resB64) {
                     imageCache[cacheKey] = resB64;
-                    imageCache[`id:${productId}`] = resB64;
+                    imageCache[`id:${numId}`] = resB64;
                 }
             });
             imageCache[cacheKey] = url;
@@ -392,118 +422,242 @@
     }
 
     /**
+     * ស្រង់ទិន្នន័យពី Orderline នីមួយៗ (គាំទ្រទាំង Odoo 16/17/18 និង DOM fallback)
+     */
+    function extractLineDetails(l, el, pos, idx) {
+        // ១. ស្វែងរក Product Record និង Product ID
+        let prod = null;
+        if (typeof l?.get_product === 'function') {
+            try { prod = l.get_product(); } catch (_) {}
+        }
+        if (!prod && typeof l?.product === 'object' && l?.product !== null) {
+            prod = l.product;
+        }
+        if (!prod && typeof l?.product_id === 'object' && l?.product_id !== null) {
+            prod = l.product_id;
+        }
+
+        let prodId = null;
+        if (prod && typeof prod.id === 'number') {
+            prodId = prod.id;
+        } else if (typeof l?.product_id === 'number') {
+            prodId = l.product_id;
+        } else if (typeof l?.product === 'number') {
+            prodId = l.product;
+        } else if (Array.isArray(l?.product_id)) {
+            prodId = l.product_id[0];
+        } else if (Array.isArray(l?.product)) {
+            prodId = l.product[0];
+        } else if (el) {
+            const dId = el.dataset?.productId || el.getAttribute?.('data-product-id');
+            if (dId && !isNaN(Number(dId))) prodId = Number(dId);
+        }
+
+        // ប្រសិនបើស្គាល់ prodId អាចទាញ Product Record ពី pos model / db បន្ថែម
+        if (prodId && pos) {
+            try {
+                const dbProd = (pos.db?.get_product_by_id?.(prodId)) ||
+                               (pos.db?.product_by_id?.[prodId]) ||
+                               (pos.models?.['product.product']?.get?.(prodId));
+                if (dbProd) {
+                    if (!prod) prod = dbProd;
+                    else prod = Object.assign({}, dbProd, prod);
+                }
+            } catch (_) {}
+        }
+
+        // ២. ស្រង់ឈ្មោះទំនិញ (Product Name)
+        let name = '';
+        if (typeof l?.get_full_product_name === 'function') {
+            try { name = l.get_full_product_name(); } catch (_) {}
+        }
+        if (!name && typeof l?.full_product_name === 'string') name = l.full_product_name;
+        if (!name && typeof l?.get_product_name === 'function') {
+            try { name = l.get_product_name(); } catch (_) {}
+        }
+        if (!name && l?.product_name) name = l.product_name;
+        if (!name && prod?.display_name) name = prod.display_name;
+        if (!name && prod?.name) name = prod.name;
+        if (!name && l?.product_id?.display_name) name = l.product_id.display_name;
+        if (!name && l?.product_id?.name) name = l.product_id.name;
+        if (!name && l?.display_name) name = l.display_name;
+        if (!name && l?.name && l.name !== '/' && l.name !== '-' && !l.name.toLowerCase().startsWith('order')) {
+            name = l.name;
+        }
+
+        // DOM Fallback សម្រាប់ Product Name
+        if ((!name || name.toLowerCase() === 'item') && el) {
+            const nameEl = el.querySelector?.('.product-name, .name, .product-title, .product-content, [class*="product_name"]');
+            if (nameEl) {
+                name = (nameEl.innerText || nameEl.textContent || '').trim();
+            } else {
+                const textNodes = Array.from(el.querySelectorAll('span, div')).filter(
+                    node => !node.innerText.includes('$') && node.children.length === 0 && node.innerText.trim().length > 1
+                );
+                if (textNodes.length > 0) {
+                    name = textNodes[0].innerText.trim();
+                }
+            }
+        }
+
+        // ៣. ស្រង់ចំនួន (Quantity)
+        let qty = 0;
+        if (typeof l?.get_quantity === 'function') {
+            try { qty = l.get_quantity(); } catch (_) {}
+        }
+        if (!qty && l?.quantity !== undefined) qty = Number(l.quantity);
+        if (!qty && l?.qty !== undefined) qty = Number(l.qty);
+
+        if ((!qty || isNaN(qty)) && el) {
+            const qtyEl = el.querySelector?.('.qty, .quantity, em');
+            if (qtyEl) {
+                const m = (qtyEl.innerText || '').match(/([0-9]+(?:\.[0-9]+)?)/);
+                if (m) qty = parseFloat(m[1]);
+            }
+            if (!qty) {
+                const m = (el.innerText || '').match(/^([0-9]+)\s+/);
+                if (m) qty = parseFloat(m[1]);
+            }
+        }
+        if (!qty || isNaN(qty) || qty <= 0) qty = 1;
+
+        // ៤. ស្រង់តម្លៃរាយ (Unit Price) និងតម្លៃសរុបប្រចាំជួរ (Line Total)
+        let price = 0;
+        let lineTotal = 0;
+
+        if (typeof l?.get_unit_display_price === 'function') {
+            try { price = l.get_unit_display_price(); } catch (_) {}
+        }
+        if (!price && typeof l?.get_unit_price === 'function') {
+            try { price = l.get_unit_price(); } catch (_) {}
+        }
+        if (!price && typeof l?.get_display_price === 'function') {
+            try { lineTotal = l.get_display_price(); } catch (_) {}
+        }
+        if (!lineTotal && typeof l?.get_price_with_tax === 'function') {
+            try { lineTotal = l.get_price_with_tax(); } catch (_) {}
+        }
+        if (!lineTotal && typeof l?.get_price_without_tax === 'function') {
+            try { lineTotal = l.get_price_without_tax(); } catch (_) {}
+        }
+
+        // Odoo 17/18 fields (price_unit, price_subtotal_incl)
+        if (!price && l?.price_unit !== undefined) price = Number(l.price_unit);
+        if (!price && l?.unit_price !== undefined) price = Number(l.unit_price);
+        if (!price && l?.price !== undefined) price = Number(l.price);
+
+        if (!lineTotal && l?.price_subtotal_incl !== undefined) lineTotal = Number(l.price_subtotal_incl);
+        if (!lineTotal && l?.price_subtotal !== undefined) lineTotal = Number(l.price_subtotal);
+
+        // តម្លៃពី Product Record
+        if (!price && prod?.lst_price !== undefined) price = Number(prod.lst_price);
+        if (!price && prod?.price !== undefined) price = Number(prod.price);
+
+        // DOM Fallback សម្រាប់តម្លៃ
+        if ((!price || price <= 0) && (!lineTotal || lineTotal <= 0) && el) {
+            const priceEl = el.querySelector?.('.price, .product-price, .price-per-unit, [class*="price"]');
+            if (priceEl) {
+                const m = (priceEl.innerText || '').match(/\$\s*([0-9]+\.[0-9]{2})/);
+                if (m) lineTotal = parseFloat(m[1]);
+            }
+            if (!lineTotal) {
+                const matches = [...(el.innerText || '').matchAll(/\$\s*([0-9]+\.[0-9]{2})/g)];
+                if (matches.length > 0) {
+                    lineTotal = parseFloat(matches[matches.length - 1][1]);
+                }
+            }
+        }
+
+        if (!lineTotal && price > 0) lineTotal = price * qty;
+        if (!price && lineTotal > 0 && qty > 0) price = lineTotal / qty;
+
+        price = Number(price) || 0;
+        lineTotal = Number(lineTotal) || (price * qty);
+
+        name = cleanProductName(name, qty);
+        if (!name) name = 'Item';
+
+        // ៥. ស្រង់រូបភាព (Product Image)
+        let img = null;
+        // ទាញផ្ទាល់ពី Product Record ក្នុង Memory
+        const rawImg = prod?.image_128 || prod?.image_256 || prod?.image_512 || l?.product_id?.image_128;
+        if (rawImg && rawImg.length > 30) {
+            img = rawImg.startsWith('data:') ? rawImg : `data:image/png;base64,${rawImg}`;
+        }
+
+        // DOM Image
+        if (!img && el) {
+            const domImg = el.querySelector('img');
+            if (domImg && domImg.src && !domImg.src.includes('placeholder')) {
+                img = getBase64FromImg(domImg) || domImg.src;
+            }
+        }
+
+        // Search Catalog
+        if (!img) {
+            img = findProductImage(prodId, name, qty);
+        }
+
+        const uom = prod?.uom_id?.[1] || prod?.uom_id?.name || l?.product_uom_id?.name || l?.uom_name || '';
+
+        return {
+            name,
+            price,
+            qty,
+            line_total: lineTotal,
+            image: img || null,
+            uom: uom || undefined
+        };
+    }
+
+    /**
      * ស្រង់ទំនិញក្នុងកន្ត្រក (Orderlines)
      */
     function extractItems(pos) {
-        // ១. ស្រង់ពី Odoo POS Object (ត្រឹមត្រូវបំផុត)
+        // ស្រង់ DOM lines ក្នុង Left Pane (Cart)
+        const domLines = Array.from(document.querySelectorAll(
+            '.pos-leftpane .orderline, .order-widget .orderline, .orderlines .orderline, ul.orderlines li.orderline, .order-container .orderline, li.orderline'
+        )).filter(l => !l.closest('.products-widget') && !l.closest('.product-list') && !l.closest('.product-screen .rightpane'));
+
+        // ១. ស្រង់ពី Odoo POS Object (OWL Framework & Legacy)
         if (pos) {
             const order = pos.get_order?.() || pos.selectedOrder;
             if (order) {
                 const rawLines = order.get_orderlines?.() || order.orderlines || order.lines || (typeof order.get_lines === 'function' ? order.get_lines() : null);
                 if (Array.isArray(rawLines) || (rawLines && typeof rawLines.length === 'number')) {
                     const lines = Array.from(rawLines);
-                    // ប្រសិនបើកន្ត្រក Odoo គ្មានទំនិញ (0 lines) ត្រូវប្រគល់ [] ភ្លាម មិនត្រូវ scrape DOM ទេ!
+                    // ប្រសិនបើកន្ត្រក Odoo គ្មានទំនិញ (0 lines) ត្រូវប្រគល់ [] ភ្លាម
                     if (lines.length === 0) {
                         return [];
                     }
-                    return lines.map(l => {
-                        let name = '';
-                        if (typeof l.get_full_product_name === 'function') name = l.get_full_product_name();
-                        else if (l.product?.display_name) name = l.product.display_name;
-                        else if (typeof l.get_product === 'function' && l.get_product()?.display_name) name = l.get_product().display_name;
-                        else if (l.product_name) name = l.product_name;
-                        else if (l.product?.name) name = l.product.name;
-                        else if (l.name) name = l.name;
 
-                        let price = 0;
-                        if (typeof l.get_unit_display_price === 'function') price = l.get_unit_display_price();
-                        else if (typeof l.get_display_price === 'function') price = l.get_display_price();
-                        else if (typeof l.get_unit_price === 'function') price = l.get_unit_price();
-                        else if (l.price !== undefined) price = l.price;
-
-                        let qty = 1;
-                        if (typeof l.get_quantity === 'function') qty = l.get_quantity();
-                        else if (l.quantity !== undefined) qty = l.quantity;
-                        else if (l.qty !== undefined) qty = l.qty;
-
-                        let lineTotal = price * qty;
-                        if (typeof l.get_display_price === 'function') lineTotal = l.get_display_price();
-                        else if (typeof l.get_price_with_tax === 'function') lineTotal = l.get_price_with_tax();
-
-                        let prod = l.product || (typeof l.get_product === 'function' ? l.get_product() : null);
-                        let prodId = prod?.id || l.product_id;
-                        if (Array.isArray(prodId)) prodId = prodId[0];
-
-                        name = cleanProductName(name, qty);
-                        const img = findProductImage(prodId, name, qty);
-
-                        return {
-                            name: name || 'Item',
-                            price: Number(price) || 0,
-                            qty: Number(qty) || 1,
-                            line_total: Number(lineTotal) || (Number(price) * Number(qty)),
-                            image: img || null
-                        };
+                    const extracted = lines.map((l, idx) => {
+                        const matchingDomEl = domLines[idx] || null;
+                        return extractLineDetails(l, matchingDomEl, pos, idx);
                     });
+
+                    // ប្រសិនបើទាញបានទំនិញដែលមានឈ្មោះ និងតម្លៃត្រឹមត្រូវ ត្រឡប់វាភ្លាម
+                    const validCount = extracted.filter(i => i.name && i.name !== 'Item' && i.price > 0).length;
+                    if (validCount > 0 || domLines.length === 0) {
+                        return extracted;
+                    }
                 }
             }
         }
 
-        // ២. ស្រង់ពី DOM (តែក្នុង Cart Left Pane ប៉ុណ្ណោះ មិន scrape product list ទេ)
-        const items = [];
-        const lines = document.querySelectorAll('.pos-leftpane .orderline, .order-widget .orderline, .orderlines .orderline, ul.orderlines li.orderline');
-        lines.forEach(l => {
-            if (l.closest('.products-widget') || l.closest('.product-list') || l.closest('.product-screen .rightpane')) return;
+        // ២. Fallback: ស្រង់ពី DOM lines ផ្ទាល់
+        if (domLines.length > 0) {
+            return domLines.map((el, idx) => {
+                let compLine = null;
+                try {
+                    const comp = el.__owl__?.component;
+                    compLine = comp?.props?.line || comp?.line || null;
+                } catch (_) {}
+                return extractLineDetails(compLine, el, pos, idx);
+            });
+        }
 
-            let name = '';
-            let price = 0;
-            let qty = 1;
-            let prodId = null;
-
-            // Try OWL component on line
-            try {
-                const comp = l.__owl__?.component;
-                const line = comp?.props?.line || comp?.line;
-                if (line) {
-                    const prod = line.product || (typeof line.get_product === 'function' ? line.get_product() : null);
-                    if (prod) {
-                        prodId = prod.id;
-                        name = line.get_full_product_name?.() || prod.display_name || prod.name || '';
-                    }
-                    if (typeof line.get_unit_display_price === 'function') price = line.get_unit_display_price();
-                    else if (typeof line.get_display_price === 'function') price = line.get_display_price();
-                    else if (line.price !== undefined) price = line.price;
-
-                    if (typeof line.get_quantity === 'function') qty = line.get_quantity();
-                    else if (line.quantity !== undefined) qty = line.quantity;
-                    else if (line.qty !== undefined) qty = line.qty;
-                }
-            } catch (_) {}
-
-            if (!name) {
-                const nameEl  = l.querySelector('.product-name, .name, .product-title');
-                const priceEl = l.querySelector('.price, .product-price');
-                const qtyEl   = l.querySelector('.qty, .quantity');
-
-                if (nameEl) name = nameEl.innerText.trim();
-                if (priceEl && !price) price = parseFloat(priceEl.innerText.replace(/[^0-9.]/g, '')) || 0;
-                if (qtyEl && qty === 1) qty = parseFloat(qtyEl.innerText.replace(/[^0-9.]/g, '')) || 1;
-            }
-
-            if (name) {
-                name = cleanProductName(name, qty);
-                const img = findProductImage(prodId, name, qty);
-                items.push({
-                    name,
-                    price: Number(price) || 0,
-                    qty: Number(qty) || 1,
-                    line_total: (Number(price) || 0) * (Number(qty) || 1),
-                    image: img || null
-                });
-            }
-        });
-
-        return items;
+        return [];
     }
 
     /**
