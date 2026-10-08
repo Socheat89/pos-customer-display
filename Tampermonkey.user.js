@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.11
+// @version      14.13
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -22,12 +22,11 @@
     const VERCEL_API  = `${VERCEL_BASE}/api/order`;
 
     // ── Persistent Cache across screen switches ────────────────
-    let lastKey           = '';
-    let lastScreenState   = '';
-    let cachedItems       = [];
-    let cachedTotal       = 0;
-    let cachedRef         = '';
-    let validatedOrderRef = '';
+    let lastKey         = '';
+    let lastScreenState = '';
+    let cachedItems     = [];
+    let cachedTotal     = 0;
+    let cachedRef       = '';
 
     /**
      * ស្វែងរក Object pos របស់ Odoo POS (OWL Framework & Legacy)
@@ -176,24 +175,35 @@
      * ត្រួតពិនិត្យថា Cashier ស្ថិតលើផ្ទាំង Receipt (ទូទាត់រួចរាល់) ឬអត់
      */
     function isReceiptScreenActive() {
+        // បើផ្ទាំង ProductScreen ឬ PaymentScreen កំពុងបង្ហាញ មានន័យថាមិនមែន ReceiptScreen ទេ!
+        const prodScreen = document.querySelector(
+            '.product-screen, [class*="product-screen"], .products-widget'
+        );
+        if (prodScreen && prodScreen.offsetParent !== null) return false;
+
+        const payScreen = document.querySelector(
+            '.payment-screen, [class*="payment-screen"], [class*="PaymentScreen"]'
+        );
+        if (payScreen && payScreen.offsetParent !== null) return false;
+
         try {
             const pos = getOdooPos();
             if (pos) {
                 const screen = pos.mainScreen?.component?.name || pos.mainScreen?.name;
-                if (screen === 'ReceiptScreen' || screen?.toLowerCase()?.includes('receipt')) return true;
+                if (screen === 'ReceiptScreen') return true;
+                if (screen === 'ProductScreen' || screen === 'PaymentScreen') return false;
 
                 const currentOrder = pos.get_order?.() || pos.selectedOrder;
-                const screenData = currentOrder?.get_screen_data?.() || currentOrder?.screen_data;
-                if (screenData?.name === 'ReceiptScreen' || screenData?.name?.toLowerCase()?.includes('receipt')) return true;
-
-                if (currentOrder?.finalized === true || currentOrder?.state === 'paid' || currentOrder?.state === 'done') return true;
-                if (typeof currentOrder?.is_paid === 'function' && currentOrder.is_paid()) return true;
-                if (typeof currentOrder?.get_due === 'function' && currentOrder.get_due() <= 0 && currentOrder.get_total_paid?.() > 0) return true;
+                if (currentOrder) {
+                    const screenData = currentOrder.get_screen_data?.() || currentOrder.screen_data;
+                    if (screenData?.name === 'ReceiptScreen') return true;
+                    if (screenData?.name === 'ProductScreen' || screenData?.name === 'PaymentScreen') return false;
+                }
             }
         } catch (_) {}
 
         return Boolean(document.querySelector(
-            '.receipt-screen, [class*="ReceiptScreen"], .pos-receipt-container, .pos-receipt, .receipt-content, button.next.validation'
+            '.receipt-screen, [class*="ReceiptScreen"], .pos-receipt-container, .pos-receipt, .receipt-content'
         ));
     }
 
@@ -206,10 +216,8 @@
             try {
                 const order = pos.get_order?.() || pos.selectedOrder;
                 if (order) {
-                    const rawLines = order.get_orderlines?.() || order.orderlines || order.lines || (typeof order.get_lines === 'function' ? order.get_lines() : null);
-                    if (Array.isArray(rawLines) && rawLines.length === 0) return 0; // កន្ត្រកទទេ 100%
                     const total = order.get_total_with_tax?.() ?? order.get_total?.();
-                    if (typeof total === 'number') return Math.max(0, total);
+                    if (typeof total === 'number' && total > 0) return total;
                 }
             } catch (_) {}
         }
@@ -219,6 +227,7 @@
             '.order-summary .total',
             '.order-summary .amount',
             '.order-summary .value',
+            '.order-summary',
             '.pads .subentry .value',
             '.payment-screen .total',
             '.paymentlines-container .total'
@@ -643,26 +652,18 @@
         }
 
         // ──────────────────────────────────────────────────────────
-        // E. ពិនិត្យថា Order ត្រូវបាន Validate ឬ Paid រួចរាល់
+        // E. ពិនិត្យថា Order ស្ថិតលើ ReceiptScreen (ទូទាត់រួច)
         // ──────────────────────────────────────────────────────────
         const currentOrder = pos?.get_order?.();
-        const isOrderFinalized = Boolean(
-            isReceipt ||
-            (currentOrder && (
-                currentOrder.finalized === true ||
-                currentOrder.state === 'paid' ||
-                currentOrder.state === 'done' ||
-                (typeof currentOrder.is_paid === 'function' && currentOrder.is_paid())
-            ))
-        );
-
-        if (isOrderFinalized) {
-            const finalRef = extractOrderRef(pos) || cachedRef || '';
-            if (finalRef) validatedOrderRef = finalRef;
-            if (lastKey !== 'SUCCESS_SENT') {
-                const finalTotal = cachedTotal || extractTotal(pos);
-                const finalItems = cachedItems.length ? cachedItems : extractItems(pos);
-                sendPaymentSuccess(finalRef || 'POS-ORDER', finalTotal, finalItems, currency);
+        const isFinalized = Boolean(currentOrder?.finalized);
+        if (isReceipt || isFinalized) {
+            cachedItems = [];
+            cachedTotal = 0;
+            cachedRef   = '';
+            if (lastKey !== 'RESET_IDLE') {
+                lastKey = 'RESET_IDLE';
+                console.log('[POS Sync] ReceiptScreen / Order finalized active → resetting display to IDLE');
+                GM_xmlhttpRequest({ method: 'POST', url: RESET_API });
             }
             return;
         }
@@ -674,11 +675,6 @@
         let items = extractItems(pos);
         const currentRef = extractOrderRef(pos);
 
-        // ប្រសិនបើ Order នេះត្រូវបាន Validate / Paid រួចរាល់ហើយ មិនត្រូវ Sync ឡើងវិញជា ACTIVE ដាច់ខាត!
-        if (currentRef && validatedOrderRef && currentRef === validatedOrderRef) {
-            return;
-        }
-
         // ប្រសិនបើដូរ Order Tab (ឧ. ពី 68003 ទៅ 68004) -> សម្អាត Cache ចាស់ចោលភ្លាម
         if (currentRef && cachedRef && currentRef !== cachedRef) {
             console.log(`[POS Sync] New order detected: ${currentRef} (was ${cachedRef}) -> clearing cache`);
@@ -686,9 +682,6 @@
             cachedTotal = 0;
             cachedRef   = currentRef;
             lastKey     = '';
-            if (validatedOrderRef && currentRef !== validatedOrderRef) {
-                validatedOrderRef = '';
-            }
         }
         if (currentRef) cachedRef = currentRef;
 
@@ -756,6 +749,7 @@
             : (cachedRef && cachedRef !== '/' && cachedRef !== '-')
                 ? cachedRef
                 : 'POS-' + Math.floor(1000 + Math.random() * 9000);
+        const itemsKey = items.map(i => `${i.name}_${i.qty}_${i.price}_${i.image ? '1' : '0'}`).join('|');
         const key      = `${STORE_ID}|${total}|${showQR}|${itemsKey}|${orderRef}|${currency}`;
 
         if (total > 0 && key !== lastKey) {
@@ -800,7 +794,7 @@
     // ពិនិត្យរៀងរាល់ 250ms
     setInterval(checkPOS, 250);
 
-    // ចាប់ Event Click ដើម្បី Sync ភ្លាមៗ (ចុច Payment, Validate, etc.)
+    // ចាប់ Event Click ដើម្បី Sync ភ្លាមៗ (ចុច Payment, Validate, New Order, etc.)
     document.addEventListener('click', function(e) {
         const target = e.target;
         const btn = target?.closest?.('button.validate, .button.validate, button.validation, .payment-screen button.next, button.highlight, .pay-circle, [class*="validate"]');
@@ -808,12 +802,8 @@
 
         // ប្រសិនបើចុចលើប៊ូតុង Validate ត្រូវកត់ត្រាថា Payment រួចរាល់ភ្លាម
         if (btn || txt === 'validate' || txt.includes('validate')) {
-            console.log('🖱️ [POS Sync] Validate button clicked → marking order completed');
+            console.log('🖱️ [POS Sync] Validate button clicked → resetting display to IDLE');
             try {
-                const pos = getOdooPos();
-                const ord = pos?.get_order?.();
-                const ref = extractOrderRef(pos) || cachedRef || 'POS-ORDER';
-                validatedOrderRef = ref;
                 cachedItems = [];
                 cachedTotal = 0;
                 cachedRef   = '';
@@ -825,6 +815,15 @@
                     url: `${VERCEL_BASE}/api/reset?store=${getStoreId()}`
                 });
             } catch (_) {}
+        }
+
+        // ចុចលើប៊ូតុង New Order (+) ឬដូរ Order Tab
+        const newOrderBtn = target?.closest?.('.new-order, .order-button, .ticket-button, button.next');
+        if (newOrderBtn || txt.includes('new order') || txt === '+') {
+            cachedItems = [];
+            cachedTotal = 0;
+            cachedRef   = '';
+            lastKey     = '';
         }
 
         setTimeout(checkPOS, 30);
