@@ -22,6 +22,9 @@ function getFormattedReqTime() {
 /**
  * 24-Slot Fixed Order Hash Specification for ABA PayWay Purchase API
  */
+/**
+ * 24-Slot Fixed Order Hash Specification for ABA PayWay Purchase API
+ */
 const PURCHASE_HASH_ORDER = [
   "req_time", "merchant_id", "tran_id", "amount", "items", "shipping",
   "firstname", "lastname", "email", "phone", "type", "payment_option",
@@ -31,27 +34,13 @@ const PURCHASE_HASH_ORDER = [
 ];
 
 /**
- * 19-Field Order Hash Specification for ABA PayWay Generate-QR API
- */
-const GENERATE_QR_HASH_ORDER = [
-  "req_time", "merchant_id", "tran_id", "amount", "items",
-  "first_name", "last_name", "email", "phone", "purchase_type",
-  "payment_option", "callback_url", "return_deeplink", "currency",
-  "custom_fields", "return_params", "payout", "lifetime", "qr_image_template"
-];
-
-/**
- * Call ABA PayWay Sandbox / Production API to create transaction and fetch KHQR string / image
- * Supports both /payments/purchase (Postman 24-slot Form-Data) and /payments/generate-qr (JSON)
+ * Call ABA PayWay Sandbox / Production API to create transaction and fetch KHQR string & image
+ * Supports /payments/purchase (standard urlencoded POST)
  */
 async function fetchABAPaywayQR({ storeId, reference, amount, currency, items }) {
   const merchantId = process.env.ABA_PAYWAY_MERCHANT_ID;
   const apiKey     = process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY;
-  // Always use the official generate-qr endpoint to get the pre-rendered template3_color qrImage
-  let apiUrl       = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/generate-qr';
-  if (apiUrl.includes('/payments/purchase')) {
-    apiUrl = apiUrl.replace('/payments/purchase', '/payments/generate-qr');
-  }
+  let apiUrl       = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
 
   if (!merchantId || !apiKey) {
     console.warn('[payway] Missing ABA_PAYWAY_MERCHANT_ID or ABA_PAYWAY_PUBLIC_KEY in Environment Variables');
@@ -62,7 +51,7 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
   const formattedAmount = Number(amount || 0).toFixed(2);
   const pad = n => String(n).padStart(2, "0");
   const d = new Date();
-  // UTC req_time matching Postman Pre-request script
+  // UTC req_time matching ABA PayWay specification (YYYYMMDDHHmmss)
   const req_time = `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}` +
                    `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
   const tran_id = String(reference || `T${Date.now()}`)
@@ -81,112 +70,112 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
 
   // Callback / Return URL
   const callbackUrl = process.env.VERCEL_URL
-    ? Buffer.from(`https://${process.env.VERCEL_URL}/api/callback?store=${storeId}`).toString('base64')
-    : Buffer.from(`https://pos-customer-display.vercel.app/api/callback?store=${storeId}`).toString('base64');
+    ? `https://${process.env.VERCEL_URL}/api/callback?store=${storeId}`
+    : `https://pos-customer-display.vercel.app/api/callback?store=${storeId}`;
+
+  // Helper to call ABA PayWay Purchase API
+  async function callPurchaseApi(endpointUrl) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6500);
+
+    const f = {
+      req_time,
+      merchant_id:          merchantId,
+      tran_id,
+      amount:               formattedAmount,
+      items:                items_base64,
+      shipping:             '',
+      firstname:            'SK',
+      lastname:             'Store',
+      email:                'pos@skstore.com',
+      phone:                '012345678',
+      type:                 'purchase',
+      payment_option:       'abapay_khqr',
+      return_url:           callbackUrl,
+      cancel_url:           '',
+      continue_success_url: '',
+      return_deeplink:      '',
+      currency:             currency || 'USD',
+      custom_fields:        '',
+      return_params:        storeId,
+      payout:               '',
+      lifetime:             '5',
+      additional_params:    '',
+      google_pay_token:     '',
+      skip_success_page:    '',
+    };
+
+    const b4hash = PURCHASE_HASH_ORDER.map(k => (f[k] !== undefined && f[k] !== null ? String(f[k]) : '')).join('');
+    f.hash = crypto.createHmac('sha512', apiKey).update(b4hash).digest('base64');
+
+    const params = new URLSearchParams();
+    Object.keys(f).forEach(k => {
+      if (f[k] !== '') {
+        params.append(k, String(f[k]));
+      }
+    });
+
+    try {
+      const response = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return { ok: response.ok, status: response.status, response };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      return { ok: false, error: err.message };
+    }
+  }
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-    let response;
-
-    // ── Branch A: /payments/generate-qr (JSON Payload — returns qrImage template3_color) ──────────────
+    // If configured URL is purchase or general endpoint
+    let purchaseUrl = apiUrl;
     if (apiUrl.includes('generate-qr')) {
-      const qrf = {
-        req_time,
-        merchant_id: merchantId,
-        tran_id,
-        first_name: 'ABA',
-        last_name: 'Bank',
-        email: 'cheatgaming1111@gmail.com',
-        phone: '012345678',
-        amount: Number(formattedAmount),
-        purchase_type: 'purchase',
-        payment_option: 'abapay_khqr',
-        items: items_base64,
-        currency: currency || 'USD',
-        callback_url: callbackUrl,
-        return_deeplink: null,
-        custom_fields: null,
-        return_params: null,
-        payout: null,
-        lifetime: 6,
-        qr_image_template: 'template3_color',
-      };
-      const b4hash = GENERATE_QR_HASH_ORDER.map(k => (qrf[k] !== undefined && qrf[k] !== null ? String(qrf[k]) : '')).join('');
-      qrf.hash = crypto.createHmac('sha512', apiKey).update(b4hash).digest('base64');
-
-      response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(qrf),
-        signal: controller.signal,
-      });
-    } else {
-      // ── Branch B: /payments/purchase (Postman 24-slot Form-Data) ───
-      const f = {
-        req_time,
-        merchant_id:          merchantId,
-        tran_id,
-        amount:               formattedAmount,
-        items:                items_base64,
-        shipping:             '',
-        firstname:            'SK',
-        lastname:             'Store',
-        email:                'cheatgaming1111@gmail.com',
-        phone:                '012345678',
-        type:                 'purchase',
-        payment_option:       'abapay_khqr_deeplink',
-        return_url:           callbackUrl,
-        cancel_url:           '',
-        continue_success_url: '',
-        return_deeplink:      '',
-        currency:             currency || 'USD',
-        custom_fields:        '',
-        return_params:        storeId,
-        payout:               '',
-        lifetime:             '10',
-        additional_params:    '',
-        google_pay_token:     '',
-        skip_success_page:    '',
-      };
-
-      const b4hash = PURCHASE_HASH_ORDER.map(k => (f[k] !== undefined && f[k] !== null ? String(f[k]) : '')).join('');
-      f.hash = crypto.createHmac('sha512', apiKey).update(b4hash).digest('base64');
-
-      // Send form-data with only non-empty fields (per Postman script sent = Object.keys(f).filter(k => f[k] !== ""))
-      const formData = new FormData();
-      Object.keys(f).forEach(k => {
-        if (f[k] !== '') {
-          formData.append(k, String(f[k]));
-        }
-      });
-
-      response = await fetch(apiUrl, {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-      });
+      // In sandbox, generate-qr often fails with 403; purchase endpoint is 100% reliable
+      purchaseUrl = apiUrl.replace('/payments/generate-qr', '/payments/purchase');
     }
 
-    clearTimeout(timeoutId);
+    const callResult = await callPurchaseApi(purchaseUrl);
 
-    if (response.ok) {
-      const data = await response.json();
-      console.log(`[payway] API Response for store=${storeId}:`, data);
-      if (data.qrImage || data.qrString || data.status?.code === '0' || data.status === '0' || data.status === 0 || data.status === 'SUCCESS') {
-        return {
-          tran_id,
-          qrString: data.qrString || data.qr_string || null,
-          qrImage: data.qrImage || data.qr_image || null,
-          abapay_deeplink: data.abapay_deeplink || null,
-        };
+    if (callResult && callResult.response) {
+      const response = callResult.response;
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[payway] API Response for store=${storeId}:`, data);
+        const isSuccess =
+          data.status?.code === '00' ||
+          data.status?.code === '0' ||
+          data.status === '00' ||
+          data.status === '0' ||
+          data.status === 0 ||
+          data.status === 'SUCCESS' ||
+          Boolean(data.qrImage || data.qrString || data.qr_string);
+
+        if (isSuccess && (data.qrString || data.qr_string || data.qrImage || data.qr_image)) {
+          let qrImg = data.qrImage || data.qr_image || null;
+          if (qrImg && !qrImg.startsWith('data:') && !qrImg.startsWith('http')) {
+            qrImg = `data:image/png;base64,${qrImg}`;
+          }
+          return {
+            tran_id,
+            qrString: data.qrString || data.qr_string || null,
+            qrImage: qrImg,
+            abapay_deeplink: data.abapay_deeplink || null,
+            is_payway: true,
+            endpoint_used: purchaseUrl,
+          };
+        }
+        return { error: 'PayWay returned non-zero status', raw: data };
+      } else {
+        const errTxt = await response.text();
+        console.warn(`[payway] HTTP ${response.status}:`, errTxt);
+        return { error: `HTTP ${response.status}`, details: errTxt };
       }
-      return { error: 'PayWay returned non-zero status', raw: data };
     } else {
-      const errTxt = await response.text();
-      console.warn(`[payway] HTTP ${response.status}:`, errTxt);
-      return { error: `HTTP ${response.status}`, details: errTxt };
+      return { error: callResult?.error || 'Failed to connect to PayWay API' };
     }
   } catch (err) {
     console.warn(`[payway] Failed to fetch ABA PayWay API:`, err.message);
@@ -278,31 +267,38 @@ export default async function handler(req, res) {
     const items = Array.isArray(payload.items) ? payload.items : (Array.isArray(payload.order_lines) ? payload.order_lines : []);
 
     const reqStatus = (payload.status || 'ACTIVE').toUpperCase();
+    const isPaymentMode = Boolean(payload.show_qr || payload.is_payment || payload.payment);
 
     // 1. Direct qrString / qrImage from payload
     let qrString = payload.qrString || payload.qr_string || payload.qr_code || payload.qr || null;
     let qrImage  = payload.qrImage || payload.qr_image || null;
     let deeplink = payload.abapay_deeplink || null;
+    let isPayway = Boolean(qrString || qrImage);
+    let paywayDebug = null;
+    let paywayRes = null;
 
-    // Fast cache check: if this order already has a generated qr_string with same amount, reuse it instantly!
+    // Fast cache check: if this order already has a generated genuine PayWay QR with same amount, reuse it!
     if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0) {
       try {
         const prevRaw = await redis.get(`pos_session_${storeId}`);
         if (prevRaw) {
           const prev = typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw;
-          if (prev && prev.reference === reference && Number(prev.amount_total) === amountTotal && (prev.qr_string || prev.qr_image)) {
-            qrString = prev.qr_string;
-            qrImage  = prev.qr_image;
-            deeplink = prev.abapay_deeplink;
+          if (prev && prev.reference === reference && Number(prev.amount_total) === amountTotal) {
+            // Only reuse if it was a genuine PayWay QR, OR if we are NOT currently in payment mode
+            if (prev.is_payway || prev.qr_image || !isPaymentMode) {
+              qrString = prev.qr_string;
+              qrImage  = prev.qr_image;
+              deeplink = prev.abapay_deeplink;
+              isPayway = Boolean(prev.is_payway || prev.qr_image);
+              paywayDebug = prev._payway_debug || null;
+            }
           }
         }
       } catch (_) {}
     }
 
-    let paywayDebug = null;
-    let paywayRes = null;
-    // 2. Otherwise generate dynamic KHQR via ABA PayWay Sandbox / Production API
-    if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0) {
+    // 2. Dynamic KHQR via ABA PayWay Sandbox / Production API
+    if (reqStatus !== 'SUCCESS' && !isPayway && amountTotal > 0 && isPaymentMode) {
       paywayRes = await fetchABAPaywayQR({
         storeId,
         reference,
@@ -316,12 +312,13 @@ export default async function handler(req, res) {
           qrString = paywayRes.qrString;
           qrImage  = paywayRes.qrImage;
           deeplink = paywayRes.abapay_deeplink;
+          isPayway = true;
         }
       }
     }
 
-    // 3. Dynamic EMVCo KHQR string with valid CRC16 Checksum for the exact amount
-    if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0) {
+    // 3. Dynamic EMVCo KHQR fallback only if PayWay failed or is unavailable
+    if (reqStatus !== 'SUCCESS' && !qrString && !qrImage && amountTotal > 0 && isPaymentMode) {
       qrString = generateEMVCoKHQR({
         merchantName: 'SK STORE',
         city: 'Phnom Penh',
@@ -350,7 +347,8 @@ export default async function handler(req, res) {
       qr_string: qrString,
       qr_image: qrImage,
       abapay_deeplink: deeplink,
-      show_qr: reqStatus === 'SUCCESS' ? false : (payload.show_qr !== undefined ? Boolean(payload.show_qr) : Boolean(payload.is_payment || payload.payment)),
+      is_payway: isPayway,
+      show_qr: reqStatus === 'SUCCESS' ? false : isPaymentMode,
       updated_at: Date.now(),
       _payway_debug: paywayDebug,
     };

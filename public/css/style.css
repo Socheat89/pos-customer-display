@@ -469,12 +469,14 @@ html, body {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
-/* When showing direct pre-rendered ABA PayWay official Base64 image, keep matching wrapper */
+/* When showing direct pre-rendered ABA PayWay official Base64 image, transparentize the outer wrapper to show the clean full-size image */
 .t3-modal-wrapper.t3-wrapper-raw-image {
-  padding: 16px 85px 16px !important;
-  max-width: 386px !important;
-  background: #E8E9EC !important;
-  border-radius: 26px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  max-width: 320px !important;
+  width: auto !important;
 }
 
 @keyframes t3Popup {
@@ -508,13 +510,13 @@ html, body {
 
 /* Official PayWay Pre-rendered template3_color Base64 Image */
 .t3-official-image {
-  max-width: 216px;
+  max-width: 320px;
   width: 100%;
   height: auto;
-  border-radius: 0;
+  border-radius: 24px;
   display: block;
   margin: 0 auto;
-  box-shadow: none;
+  filter: drop-shadow(0 20px 50px rgba(0, 0, 0, 0.45));
   animation: modalPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

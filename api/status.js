@@ -15,7 +15,7 @@ function getUtcReqTime() {
 async function checkPaywayTransaction(tranId) {
   const merchantId = process.env.ABA_PAYWAY_MERCHANT_ID;
   const apiKey     = process.env.ABA_PAYWAY_PUBLIC_KEY || process.env.ABA_PAYWAY_API_KEY;
-  let apiUrl       = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/generate-qr';
+  let apiUrl       = process.env.ABA_PAYWAY_API_URL || 'https://checkout-sandbox.payway.com.kh/api/payment-gateway/v1/payments/purchase';
 
   if (!merchantId || !apiKey || !tranId) return false;
 

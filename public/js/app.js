@@ -446,9 +446,9 @@
 
     if (khqrModal) {
       if (showQR && (data.qr_image || data.qr_string)) {
-        // Prioritize official Base64 pre-rendered image from ABA PayWay
-        if (data.qr_image) {
-          const rawImg = data.qr_image;
+        // Prioritize official Base64 pre-rendered image from ABA PayWay (/api/status?store=)
+        const rawImg = data.qr_image || data.qrImage;
+        if (rawImg) {
           const base64Src = rawImg.startsWith("data:") || rawImg.startsWith("http")
             ? rawImg
             : `data:image/png;base64,${rawImg}`;
