@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.10
+// @version      14.11
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -22,11 +22,12 @@
     const VERCEL_API  = `${VERCEL_BASE}/api/order`;
 
     // ── Persistent Cache across screen switches ────────────────
-    let lastKey          = '';
-    let lastScreenState  = '';
-    let cachedItems      = [];
-    let cachedTotal      = 0;
-    let cachedRef        = '';
+    let lastKey           = '';
+    let lastScreenState   = '';
+    let cachedItems       = [];
+    let cachedTotal       = 0;
+    let cachedRef         = '';
+    let validatedOrderRef = '';
 
     /**
      * ស្វែងរក Object pos របស់ Odoo POS (OWL Framework & Legacy)
@@ -178,14 +179,22 @@
         try {
             const pos = getOdooPos();
             if (pos) {
-                if (pos.mainScreen?.name === 'ReceiptScreen') return true;
-                const currentOrder = pos.get_order?.();
+                const screen = pos.mainScreen?.component?.name || pos.mainScreen?.name;
+                if (screen === 'ReceiptScreen' || screen?.toLowerCase()?.includes('receipt')) return true;
+
+                const currentOrder = pos.get_order?.() || pos.selectedOrder;
                 const screenData = currentOrder?.get_screen_data?.() || currentOrder?.screen_data;
-                if (screenData?.name === 'ReceiptScreen') return true;
+                if (screenData?.name === 'ReceiptScreen' || screenData?.name?.toLowerCase()?.includes('receipt')) return true;
+
+                if (currentOrder?.finalized === true || currentOrder?.state === 'paid' || currentOrder?.state === 'done') return true;
+                if (typeof currentOrder?.is_paid === 'function' && currentOrder.is_paid()) return true;
+                if (typeof currentOrder?.get_due === 'function' && currentOrder.get_due() <= 0 && currentOrder.get_total_paid?.() > 0) return true;
             }
         } catch (_) {}
 
-        return Boolean(document.querySelector('.receipt-screen, .pos-receipt-container'));
+        return Boolean(document.querySelector(
+            '.receipt-screen, [class*="ReceiptScreen"], .pos-receipt-container, .pos-receipt, .receipt-content, button.next.validation'
+        ));
     }
 
     /**
@@ -195,10 +204,12 @@
         // ១. ស្រង់ពី Odoo POS Object
         if (pos) {
             try {
-                const order = pos.get_order?.();
+                const order = pos.get_order?.() || pos.selectedOrder;
                 if (order) {
+                    const rawLines = order.get_orderlines?.() || order.orderlines || order.lines || (typeof order.get_lines === 'function' ? order.get_lines() : null);
+                    if (Array.isArray(rawLines) && rawLines.length === 0) return 0; // កន្ត្រកទទេ 100%
                     const total = order.get_total_with_tax?.() ?? order.get_total?.();
-                    if (typeof total === 'number' && total > 0) return total;
+                    if (typeof total === 'number') return Math.max(0, total);
                 }
             } catch (_) {}
         }
@@ -208,11 +219,9 @@
             '.order-summary .total',
             '.order-summary .amount',
             '.order-summary .value',
-            '.order-summary',
             '.pads .subentry .value',
             '.payment-screen .total',
-            '.paymentlines-container',
-            '.pay .amount'
+            '.paymentlines-container .total'
         ];
         for (const sel of totalSelectors) {
             const els = document.querySelectorAll(sel);
@@ -225,20 +234,7 @@
             }
         }
 
-        // ៣. ស្វែងរកទូទៅដែលមានពាក្យ "Total" ឬ "$" ក្នុង DOM
-        let maxTotal = 0;
-        const all = document.querySelectorAll('div, span, button');
-        for (const el of all) {
-            if (el.closest('.products-widget') || el.closest('.product-list')) continue;
-            const txt = (el.innerText || '').trim();
-            const match = txt.match(/\$\s*([0-9]+\.[0-9]{2})/);
-            if (match) {
-                const val = parseFloat(match[1]);
-                if (val > maxTotal) maxTotal = val;
-            }
-        }
-
-        return maxTotal;
+        return 0;
     }
 
     const imageCache = {};
@@ -390,13 +386,17 @@
      * ស្រង់ទំនិញក្នុងកន្ត្រក (Orderlines)
      */
     function extractItems(pos) {
-        // ១. ស្រង់ពី Odoo POS Object
+        // ១. ស្រង់ពី Odoo POS Object (ត្រឹមត្រូវបំផុត)
         if (pos) {
-            const order = pos.get_order?.();
+            const order = pos.get_order?.() || pos.selectedOrder;
             if (order) {
-                const rawLines = order.get_orderlines?.() || order.orderlines || order.lines || (typeof order.get_lines === 'function' ? order.get_lines() : []);
-                const lines = Array.isArray(rawLines) ? rawLines : Array.from(rawLines || []);
-                if (lines.length > 0) {
+                const rawLines = order.get_orderlines?.() || order.orderlines || order.lines || (typeof order.get_lines === 'function' ? order.get_lines() : null);
+                if (Array.isArray(rawLines) || (rawLines && typeof rawLines.length === 'number')) {
+                    const lines = Array.from(rawLines);
+                    // ប្រសិនបើកន្ត្រក Odoo គ្មានទំនិញ (0 lines) ត្រូវប្រគល់ [] ភ្លាម មិនត្រូវ scrape DOM ទេ!
+                    if (lines.length === 0) {
+                        return [];
+                    }
                     return lines.map(l => {
                         let name = '';
                         if (typeof l.get_full_product_name === 'function') name = l.get_full_product_name();
@@ -440,11 +440,11 @@
             }
         }
 
-        // ២. ស្រង់ពី DOM (ផ្ទាំង ProductScreen)
+        // ២. ស្រង់ពី DOM (តែក្នុង Cart Left Pane ប៉ុណ្ណោះ មិន scrape product list ទេ)
         const items = [];
-        const lines = document.querySelectorAll('.orderline, .order-line, ul.orderlines li, div[role="listitem"]');
+        const lines = document.querySelectorAll('.pos-leftpane .orderline, .order-widget .orderline, .orderlines .orderline, ul.orderlines li.orderline');
         lines.forEach(l => {
-            if (l.closest('.products-widget') || l.closest('.product-list')) return;
+            if (l.closest('.products-widget') || l.closest('.product-list') || l.closest('.product-screen .rightpane')) return;
 
             let name = '';
             let price = 0;
@@ -479,18 +479,6 @@
                 if (nameEl) name = nameEl.innerText.trim();
                 if (priceEl && !price) price = parseFloat(priceEl.innerText.replace(/[^0-9.]/g, '')) || 0;
                 if (qtyEl && qty === 1) qty = parseFloat(qtyEl.innerText.replace(/[^0-9.]/g, '')) || 1;
-
-                if (!name) {
-                    const t = (l.innerText || '').trim();
-                    const parts = t.split('\n').map(s => s.trim()).filter(Boolean);
-                    for (let part of parts) {
-                        if (!name && isNaN(Number(part)) && !part.startsWith('$')) {
-                            name = part;
-                        }
-                    }
-                    const priceM = t.match(/\$\s*([0-9.]+)/);
-                    if (priceM && !price) price = parseFloat(priceM[1]);
-                }
             }
 
             if (name) {
@@ -669,11 +657,12 @@
         );
 
         if (isOrderFinalized) {
+            const finalRef = extractOrderRef(pos) || cachedRef || '';
+            if (finalRef) validatedOrderRef = finalRef;
             if (lastKey !== 'SUCCESS_SENT') {
-                const finalRef   = extractOrderRef(pos) || cachedRef || 'POS-ORDER';
                 const finalTotal = cachedTotal || extractTotal(pos);
                 const finalItems = cachedItems.length ? cachedItems : extractItems(pos);
-                sendPaymentSuccess(finalRef, finalTotal, finalItems, currency);
+                sendPaymentSuccess(finalRef || 'POS-ORDER', finalTotal, finalItems, currency);
             }
             return;
         }
@@ -685,13 +674,21 @@
         let items = extractItems(pos);
         const currentRef = extractOrderRef(pos);
 
-        // ប្រសិនបើដូរ Order Tab (ឧ. ពី 68002 ទៅ 68003) -> សម្អាត Cache ចាស់ចោលភ្លាម
+        // ប្រសិនបើ Order នេះត្រូវបាន Validate / Paid រួចរាល់ហើយ មិនត្រូវ Sync ឡើងវិញជា ACTIVE ដាច់ខាត!
+        if (currentRef && validatedOrderRef && currentRef === validatedOrderRef) {
+            return;
+        }
+
+        // ប្រសិនបើដូរ Order Tab (ឧ. ពី 68003 ទៅ 68004) -> សម្អាត Cache ចាស់ចោលភ្លាម
         if (currentRef && cachedRef && currentRef !== cachedRef) {
             console.log(`[POS Sync] New order detected: ${currentRef} (was ${cachedRef}) -> clearing cache`);
             cachedItems = [];
             cachedTotal = 0;
             cachedRef   = currentRef;
             lastKey     = '';
+            if (validatedOrderRef && currentRef !== validatedOrderRef) {
+                validatedOrderRef = '';
+            }
         }
         if (currentRef) cachedRef = currentRef;
 
@@ -699,7 +696,7 @@
         // G. Cart Empty handling (ផ្ទាំង Register / ProductScreen)
         // ──────────────────────────────────────────────────────────
         if (!isPayment && items.length === 0) {
-            // Cart ទទេលើ ProductScreen (ឧ. Order ថ្មី 68003 ឬ Cancelled)
+            // Cart ទទេលើ ProductScreen (ឧ. Order ថ្មី 68004 ឬ Cancelled)
             cachedItems = [];
             cachedTotal = 0;
             total       = 0;
@@ -708,7 +705,7 @@
                 lastKey = 'RESET_IDLE';
                 console.log('[POS Sync] ProductScreen cart is empty → calling RESET to IDLE');
                 GM_xmlhttpRequest({
-                    method: 'GET',
+                    method: 'POST',
                     url: RESET_API,
                     onload: function() {
                         console.log('✅ [POS Sync] Display reset to Welcome screen (IDLE)');
@@ -745,7 +742,7 @@
             if (lastKey !== 'RESET_IDLE') {
                 lastKey = 'RESET_IDLE';
                 console.log('[POS Sync] No items or total 0 → calling RESET');
-                GM_xmlhttpRequest({ method: 'GET', url: RESET_API });
+                GM_xmlhttpRequest({ method: 'POST', url: RESET_API });
             }
             return;
         }
@@ -811,15 +808,22 @@
 
         // ប្រសិនបើចុចលើប៊ូតុង Validate ត្រូវកត់ត្រាថា Payment រួចរាល់ភ្លាម
         if (btn || txt === 'validate' || txt.includes('validate')) {
-            console.log('🖱️ [POS Sync] Validate button clicked → syncing SUCCESS');
+            console.log('🖱️ [POS Sync] Validate button clicked → marking order completed');
             try {
                 const pos = getOdooPos();
                 const ord = pos?.get_order?.();
-                const ref = ord?.get_name?.() || ord?.name || cachedRef || 'POS-ORDER';
-                const tot = cachedTotal || extractTotal(pos);
-                const its = cachedItems.length ? cachedItems : extractItems(pos);
-                const cur = pos?.currency?.name || pos?.company_currency?.name || 'USD';
-                sendPaymentSuccess(ref, tot, its, cur);
+                const ref = extractOrderRef(pos) || cachedRef || 'POS-ORDER';
+                validatedOrderRef = ref;
+                cachedItems = [];
+                cachedTotal = 0;
+                cachedRef   = '';
+                lastKey     = 'RESET_IDLE';
+
+                // Call reset immediately so Customer Display stays in or returns to IDLE!
+                GM_xmlhttpRequest({
+                    method: 'POST',
+                    url: `${VERCEL_BASE}/api/reset?store=${getStoreId()}`
+                });
             } catch (_) {}
         }
 
