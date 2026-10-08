@@ -52,11 +52,22 @@ async function fetchABAPaywayQR({ storeId, reference, amount, currency, items })
   const d = new Date();
   const req_time = `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}` +
                    `${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}`;
-  const tran_id = String(reference || `T${Date.now()}`)
+
+  // Sanitize reference for ABA PayWay (must be valid alphanumeric, max 20 chars, never empty or "-")
+  let cleanRef = (reference || '').toString().trim();
+  if (!cleanRef || cleanRef === '/' || cleanRef === '-' || cleanRef.toLowerCase() === 'pos-order' || cleanRef.toLowerCase() === 'order') {
+    cleanRef = '';
+  }
+
+  let sanitized = cleanRef
     .replace(/[^a-zA-Z0-9-]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 20);
+
+  const tran_id = (sanitized && sanitized.length >= 2 && sanitized !== '-')
+    ? sanitized
+    : `POS-${Date.now().toString().slice(-8)}${Math.floor(10 + Math.random() * 90)}`;
 
   // Format items array for ABA PayWay spec ({name, quantity, price})
   const paywayItems = (items || []).map(i => ({
@@ -288,7 +299,11 @@ export default async function handler(req, res) {
       storeId = 'pos_default';
     }
 
-    const reference = payload.reference || payload.name || payload.pos_reference || payload._id || `POS-${Math.floor(1000 + Math.random() * 9000)}`;
+    let rawRef = (payload.reference || payload.name || payload.pos_reference || payload._id || '').toString().trim();
+    if (!rawRef || rawRef === '/' || rawRef === '-' || rawRef.toLowerCase() === 'pos-order' || rawRef.toLowerCase() === 'order') {
+      rawRef = `POS-${Date.now().toString().slice(-6)}`;
+    }
+    const reference = rawRef;
     const amountTotal = Number(payload.amount_total !== undefined ? payload.amount_total : (payload.amount !== undefined ? payload.amount : 0));
     const currency = payload.currency || (payload.currency_id === 1 ? 'USD' : (payload.currency_id === 143 ? 'KHR' : 'USD'));
     const items = Array.isArray(payload.items) ? payload.items : (Array.isArray(payload.order_lines) ? payload.order_lines : []);
@@ -359,7 +374,10 @@ export default async function handler(req, res) {
       qrString = process.env.DEFAULT_KHQR_STRING;
     }
 
-    const tran_id_used = paywayRes?.tran_id || String(reference || `T${Date.now()}`).replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 20);
+    const tran_id_used = paywayRes?.tran_id || (() => {
+      const s = String(reference || `T${Date.now()}`).replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 20);
+      return (s && s.length >= 2 && s !== '-') ? s : `POS-${Date.now().toString().slice(-8)}`;
+    })();
 
     // Standardize session data for Upstash Redis
     const sessionData = {

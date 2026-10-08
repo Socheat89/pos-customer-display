@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Odoo POS Dynamic Store Extractor & Popup KHQR Sync
 // @namespace    http://tampermonkey.net/
-// @version      14.9
+// @version      14.10
 // @description  Auto-detect POS Session/Store ID and Sync to Vercel with Popup KHQR on Payment
 // @author       Doem Socheat
 // @match        *://skco-test-saas19-0917.odoo.com/*
@@ -586,8 +586,22 @@
                 try {
                     const ord = posObj.get_order?.() || posObj.selectedOrder;
                     if (ord) {
-                        const ref = ord.get_name?.() || ord.name || ord.tracking_number || ord.sequence_number || ord.pos_reference;
-                        if (ref) return String(ref).trim();
+                        const candidates = [
+                            ord.tracking_number,
+                            ord.sequence_number,
+                            ord.get_name?.(),
+                            ord.name,
+                            ord.pos_reference,
+                            ord.uid
+                        ];
+                        for (const c of candidates) {
+                            if (c) {
+                                const s = String(c).trim();
+                                if (s && s !== '/' && s !== '-' && s !== 'false' && s !== 'undefined' && s.toLowerCase() !== 'order') {
+                                    return s;
+                                }
+                            }
+                        }
                     }
                 } catch (_) {}
             }
@@ -597,7 +611,7 @@
             );
             if (activeTab) {
                 const txt = (activeTab.innerText || activeTab.textContent || '').trim();
-                if (txt && !txt.includes('+') && !txt.toLowerCase().includes('order')) {
+                if (txt && !txt.includes('+') && !txt.toLowerCase().includes('order') && txt !== '/' && txt !== '-') {
                     return txt;
                 }
             }
@@ -740,8 +754,11 @@
         // H. Sync ទៅ Vercel តែប្រសិនបើ Key ផ្លាស់ប្ដូរ
         // ──────────────────────────────────────────────────────────
         const showQR   = isPayment;
-        const itemsKey = items.map(i => `${i.name}_${i.qty}_${i.price}_${i.image ? '1' : '0'}`).join('|');
-        const orderRef = currentRef || cachedRef || 'POS-' + Math.floor(1000 + Math.random() * 9000);
+        const orderRef = (currentRef && currentRef !== '/' && currentRef !== '-')
+            ? currentRef
+            : (cachedRef && cachedRef !== '/' && cachedRef !== '-')
+                ? cachedRef
+                : 'POS-' + Math.floor(1000 + Math.random() * 9000);
         const key      = `${STORE_ID}|${total}|${showQR}|${itemsKey}|${orderRef}|${currency}`;
 
         if (total > 0 && key !== lastKey) {
